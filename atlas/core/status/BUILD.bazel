@@ -1,0 +1,9 @@
+package(default_visibility = ["//visibility:public"])
+
+#bazel build //atlas/core/status:status
+cc_library(
+    name = "status",
+    srcs = ["status.cc"],
+    hdrs = ["status.h"],
+    visibility = ["//visibility:public"],
+)

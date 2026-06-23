@@ -1,0 +1,14 @@
+bazel-*
+.configure.bazelrc
+.vscode/
+.gradle/
+.DS_Store
+build/
+out/
+.vscode/
+proto/cc/build/
+assets/**/*.filamat
+dist/
+local/
+clang_tidy_analysis.log
+third_party/deps/
