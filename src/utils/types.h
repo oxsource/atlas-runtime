@@ -104,5 +104,28 @@ struct Tensor {
     }
 };
 
+// Returns the byte size of one element for the given data type.
+// Returns 0 for DataType::kUnknown.
+inline size_t ElementByteSize(DataType dtype) {
+    switch (dtype) {
+        case DataType::kFloat32: return 4;
+        case DataType::kFloat16: return 2;
+        case DataType::kInt8:    return 1;
+        case DataType::kUInt8:   return 1;
+        case DataType::kInt32:   return 4;
+        default:                 return 0;
+    }
+}
+
+// Returns the total number of elements described by |shape|.
+// Returns 0 if any dimension is 0, and treats -1 (dynamic) as 1.
+inline size_t ElementCount(const std::vector<int>& shape) {
+    size_t count = 1;
+    for (int dim : shape) {
+        count *= static_cast<size_t>(dim > 0 ? dim : 1);
+    }
+    return count;
+}
+
 }  // namespace utils
 }  // namespace atlas

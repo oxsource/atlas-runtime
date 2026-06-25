@@ -45,18 +45,26 @@ class BackendFactory {
 };
 
 // Convenience macro for registering a backend from its own translation unit.
-// Place this macro at the end of the backend's .cc file, outside any class.
+// Place this macro at the end of the backend's .cc file, outside any namespace.
+// |name| is the string key (e.g. "cpu"); |cls| is the fully-qualified class
+// name (e.g. atlas::backend::CpuBackend).
+//
+// __COUNTER__ is used to generate a unique variable name so that |cls| may
+// contain namespace separators (::) without breaking token-paste (##).
 //
 // Example:
-//   ATLAS_REGISTER_BACKEND("onnx", OnnxBackend)
-#define ATLAS_REGISTER_BACKEND(name, cls)                               \
-    namespace {                                                          \
-    const bool kRegistered_##cls = []() {                               \
-        ::atlas::backend::BackendFactory::Instance().Register(          \
-            name, []() { return std::make_unique<cls>(); });            \
-        return true;                                                     \
-    }();                                                                 \
+//   ATLAS_REGISTER_BACKEND("cpu", atlas::backend::CpuBackend)
+#define ATLAS_REGISTER_BACKEND_IMPL_(name, cls, counter)                \
+    namespace {                                                           \
+    const bool kAtlasBackendRegistered_##counter = []() {               \
+        ::atlas::backend::BackendFactory::Instance().Register(           \
+            name, []() { return std::make_unique<cls>(); });             \
+        return true;                                                      \
+    }();                                                                  \
     }  // namespace
+
+#define ATLAS_REGISTER_BACKEND(name, cls)  \
+    ATLAS_REGISTER_BACKEND_IMPL_(name, cls, __COUNTER__)
 
 }  // namespace backend
 }  // namespace atlas
