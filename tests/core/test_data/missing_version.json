@@ -1,0 +1,12 @@
+{
+  "name": "test-app",
+  "models": [
+    {
+      "id": "detector",
+      "backend": "onnx",
+      "model_path": "/tmp/model.onnx",
+      "inputs": [{"name": "x", "shape": [1, 3, 224, 224], "dtype": "float32"}],
+      "outputs": [{"name": "y", "shape": [1, 1000], "dtype": "float32"}]
+    }
+  ]
+}

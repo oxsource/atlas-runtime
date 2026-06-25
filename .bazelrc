@@ -1,0 +1,6 @@
+# Default build flags for all targets.
+build --cxxopt=-std=c++17
+build --host_cxxopt=-std=c++17
+
+# Treat warnings as errors for project sources (optional, can be removed if too strict).
+# build --cxxopt=-Werror

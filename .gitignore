@@ -1,0 +1,21 @@
+# Bazel build artifacts and symlinks
+bazel-*
+
+# macOS metadata
+.DS_Store
+
+# Editor / IDE directories
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Compiled object files and binaries
+*.o
+*.a
+*.so
+*.dylib
+
+# Python bytecode (in case any scripts are added later)
+__pycache__/
+*.pyc
