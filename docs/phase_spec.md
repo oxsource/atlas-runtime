@@ -7,26 +7,32 @@
 ## 一、阶段开发标准流程
 
 ```
-architecture.md（总则）
+proposals/（提议池）
+        │
+        │  评审采纳（详见 feature_spec.md）
+        ▼
+[Step 0] 确立新阶段，创建 phase{N}.md
         │
         ▼
-  [Step 1] 形成阶段设计文档（phase{N}.md）
+[Step 1] 形成阶段设计文档（phase{N}.md）
         │
         ▼
-  [Step 2] 开发者评估文档，确认方案
+[Step 2] 开发者评估文档，确认方案
         │
         ▼
-  [Step 3] 实现代码 + 单元测试
+[Step 3] 实现代码 + 单元测试
         │
         ▼
-  [Step 4] 构建验证，所有测试通过
+[Step 4] 构建验证，所有测试通过
         │
         ▼
-  [Step 5] 编写阶段结果文档（phase{N}_result.md）
+[Step 5] 编写阶段结果文档（phase{N}_result.md）
         │
         ▼
-  [Step 6] git commit
+[Step 6] git commit
 ```
+
+> **Step 0 说明：** 在正式编写阶段方案前，先通过 `docs/proposals/` 提议池完成想法收集与初步评审。提议流程、模板与状态流转详见 **`docs/feature_spec.md`**。小型特性经提议采纳后可直接进入 Step 3 实现，跳过 Step 1/2。
 
 ---
 
@@ -39,6 +45,7 @@ architecture.md（总则）
 **文档路径：** `docs/phase{N}.md`
 
 **文档应包含：**
+- **版本头**（置于标题下方首行，格式见下方说明）
 - 目标与交付物清单
 - 三方库选型（含引入方式、sha256 获取方法）
 - 核心数据结构定义
@@ -46,6 +53,24 @@ architecture.md（总则）
 - 目录结构规划（仅本阶段新增部分）
 - 单元测试覆盖点
 - 明确标注本阶段**不包含**的内容（划定边界）
+
+**版本头格式：**
+
+```markdown
+# 阶段N实现方案：xxx
+
+> **文档版本**：1.0.0
+> **对应代码版本**：v1.0.0（git tag）
+> **最后更新**：YYYY-MM-DD
+> **状态**：设计 / 评审中 / 已实现
+```
+
+| 字段 | 说明 |
+|------|------|
+| 文档版本 | 本篇文档的语义化版本，方案有实质变更时递增 |
+| 对应代码版本 | 文档描述的实现所对应的 git tag（未实现时填 `—`） |
+| 最后更新 | 最近一次修订日期 |
+| 状态 | `设计`（初稿）→ `评审中`（提交讨论）→ `已实现`（代码合并后） |
 
 **AI 提示话术：**
 ```
@@ -135,12 +160,37 @@ bazel test //...
 **提交规范：**
 - 格式：`feat: phase N — <简短描述>`
 - commit body 使用 `-` 逐条列出本阶段新增/修改的主要内容；
+- commit body 末尾附加 `Co-Authored-By` 或 `AI-Tool` trailer，标注当前开发所使用的 AI 工具类型及模型；
 - 每个阶段一笔完整提交，保持 git log 清晰。
+
+**AI 工具标注格式：**
+
+在 commit body 末尾添加 trailer，格式为：
+
+```
+AI-Tool: <工具名称> / <模型名称>
+```
+
+示例：
+
+```
+feat: phase 6 — public shared library and Bazel integration
+
+- Add src/public/ bridge layer with atlas_export.h symbol visibility control
+- Add include/atlas/ public header set (atlas_runtime.h, model_handle.h, types.h, version.h)
+- Add atlas_init.cc backend registration anchor for shared library builds
+- Add tools/install_atlas.sh and atlas.pc.in for non-Bazel consumers
+- Add examples/external_consumer integration demo
+
+AI-Tool: CodeBuddy / GLM-5.2
+```
+
+> 说明：项目早期阶段（phase 1-5）若已提交且未标注，无需追溯补充。自本规范生效后的提交须携带 `AI-Tool` trailer。
 
 **AI 提示话术：**
 ```
 目前阶段 N 已经完成，通过 git 执行一笔提交，
-注意 .gitignore 是否需要更新。
+注意 .gitignore 是否需要更新，并在 commit body 末尾附加 AI-Tool trailer。
 ```
 
 ---
@@ -151,7 +201,13 @@ bazel test //...
 docs/
 ├── architecture.md          # 总则：整体架构、模块说明、阶段划分
 ├── code_spec.md             # 代码规范（全局适用）
+├── feature_spec.md          # Feature 管理总则：提议收集与流转规范
+├── bugfix_spec.md           # Bugfix 管理总则：缺陷报告与修复规范
 ├── phase_spec.md            # 本文档：阶段开发规范与流程
+├── proposals/               # 提议收集池（草案 → 评审 → 采纳/驳回）
+│   ├── README.md
+│   └── NNN-*.md
+├── bugfixes/                # 缺陷报告池（BUG-NNN-*.md）
 ├── phase1.md                # 阶段一设计方案
 ├── phase1_result.md         # 阶段一结果汇总
 ├── phase2.md                # 阶段二设计方案
