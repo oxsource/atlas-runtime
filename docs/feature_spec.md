@@ -112,7 +112,7 @@ NNN-short-kebab-title.md
 # Proposal-NNN: <标题>
 
 > **提议日期**：YYYY-MM-DD
-> **提议人**：<姓名 / GitHub ID>
+> **提议人**：<git config user.name> <git config user.email>
 > **状态**：草案 / 讨论中 / 已采纳 / 已驳回
 > **类型**：阶段级 / 模块级 / 小型
 > **关联**：<引用相关的 phase 文档、architecture 章节、issue 编号等，无则填「无」>
@@ -135,6 +135,8 @@ NNN-short-kebab-title.md
 - [ ] 若采纳：补充到已有 `phase{N}.md` 或直接实现
 - [ ] 若驳回：填写驳回理由
 ```
+
+> **提议人填写方式**：执行 `git config user.name` 和 `git config user.email`，组合为 `姓名 <邮箱>` 格式填入。
 
 ---
 

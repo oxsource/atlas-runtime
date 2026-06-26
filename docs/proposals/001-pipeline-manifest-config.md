@@ -1,7 +1,7 @@
 # Proposal-001: Manifest 自由配置 Pipeline
 
 > **提议日期**：2026-06-26
-> **提议人**：开发者
+> **提议人**：pizzk <726676435@qq.com>
 > **状态**：已采纳
 > **类型**：阶段级
 > **关联**：`docs/phase2.md` 已知局限性、`docs/architecture.md` 第 3.5 节 Pipeline

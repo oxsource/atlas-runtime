@@ -79,7 +79,7 @@ BUG-NNN-short-kebab-title.md
 # BUG-NNN: <标题>
 
 > **报告日期**：YYYY-MM-DD
-> **报告人**：<姓名 / GitHub ID>
+> **报告人**：<git config user.name> <git config user.email>
 > **状态**：待确认 / 已确认 / 修复中 / 已修复 / 已驳回
 > **等级**：P0 / P1 / P2 / P3
 > **影响版本**：<受影响的版本或 git commit hash>
@@ -122,6 +122,8 @@ BUG-NNN-short-kebab-title.md
 - [ ] 更新 CHANGELOG.md
 - [ ] 关闭并归档
 ```
+
+> **报告人填写方式**：执行 `git config user.name` 和 `git config user.email`，组合为 `姓名 <邮箱>` 格式填入。
 
 ---
 
