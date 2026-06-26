@@ -20,3 +20,4 @@ NNN-short-kebab-title.md
 | 编号 | 标题 | 状态 |
 |------|------|------|
 | [001](001-pipeline-manifest-config.md) | Manifest 自由配置 Pipeline | 已采纳 |
+| [002](002-snpe-backend.md) | SNPE 后端接入 | 草案 |
