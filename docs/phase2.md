@@ -1,6 +1,6 @@
 # 阶段二实现方案：CPU 后端（ONNX Runtime）+ 基础 Pipeline
 
-> **文档版本**：1.0.0
+> **文档版本**：1.1.0
 > **对应代码版本**：v1.0.0
 > **最后更新**：2026-06-26
 > **状态**：已实现
@@ -344,3 +344,18 @@ CpuBackend::Infer(inputs, outputs)
 - TensorRT / RKNN / SNPE 等硬件加速后端（阶段四）
 - OpenCV 版 Resize（可选扩展，按需接入）
 - 后处理管线节点（如 NMS、Softmax，随具体模型需求添加）
+
+---
+
+## Feature 记录
+
+| Proposal | 日期 | 简述 | 状态 |
+|----------|------|------|------|
+| [Proposal-001](proposals/001-pipeline-manifest-config.md) | 2026-06-26 | Manifest 自由配置 Pipeline | 已采纳 |
+
+---
+
+## Bugfix 记录
+
+| BUG | 日期 | 简述 | 等级 | 状态 |
+|-----|------|------|------|------|
