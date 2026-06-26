@@ -196,7 +196,7 @@ if (dtype == "float32") { ... }   // literal string without named constant
 
 ---
 
-## 九、Bazel 构建规范
+## 十、Bazel 构建规范
 
 - 每个目录下的 `BUILD` 文件只描述本目录的目标；
 - 目标可见性默认 `//visibility:private`，需跨目录使用时显式声明；

@@ -696,7 +696,7 @@ cc_binary(
 | 新增安装脚本 | `tools/install_atlas.sh`、`tools/atlas.pc.in` | 打包安装 |
 | `AtlasRuntime::Init` 调用 `EnsureBackendsLinked()` | `src/api/atlas_runtime.cc` | 确保后端注册生效 |
 
-> **注意**：内部 `src/api/atlas_runtime.h` 保持不变（仍可直接被 tests / examples 引用），公共头文件 `include/atlas/atlas_runtime.h` 是独立的对外版本。两份头文件通过 `src/public/BUILD` 的 `deps` 关联到同一份 `.cc` 实现。后续如需统一，可在阶段七将内部头文件迁移至 `include/atlas/`。
+> **注意**：内部 `src/api/atlas_runtime.h` 保持不变（仍可直接被 tests / examples 引用），公共头文件 `include/atlas/atlas_runtime.h` 是独立的对外版本。两份头文件通过 `src/public/BUILD` 的 `deps` 关联到同一份 `.cc` 实现。后续如需统一，可通过 Feature 提议将内部头文件迁移至 `include/atlas/`。
 
 ---
 
@@ -762,12 +762,12 @@ atlas/
 
 ## 十三、阶段六不包含的内容
 
-- **C 语言绑定接口**：C API 包装（`atlas_c_api.h`）留待阶段七，为 Python / Go / Rust 等 FFI 绑定做准备。
+- **C 语言绑定接口**：C API 包装（`atlas_c_api.h`）留待后续 Feature 提议，为 Python / Go / Rust 等 FFI 绑定做准备。
 - **Bazel bzlmod 发布**：Bazel Central Registry 模块发布需升级 Bazel 至 7.x，暂不涉及。
 - **多后端动态加载**：运行时通过 `dlopen` 加载独立后端插件 `.so`（如 `libatlas_backend_tensorrt.so`）的机制留待阶段四后端扩展时设计。
 - **Windows 平台支持**：当前 `select()` 仅覆盖 macOS arm64 与 Linux x86_64，Windows `.dll` 构建不在本阶段范围。
 - **API 稳定性自动检查 CI**：`abi-compliance-checker` 集成为可选项，不阻塞交付。
-- **内部头文件迁移**：`src/api/*.h` 与 `src/utils/types.h` 仍保留原位供内部使用，公共头文件为独立副本。统一为单一头文件树留待后续重构。
+- **内部头文件迁移**：`src/api/*.h` 与 `src/utils/types.h` 仍保留原位供内部使用，公共头文件为独立副本。统一为单一头文件树留待后续 Feature 提议。
 - **模型加密 / License 校验**：商业发布相关机制不在技术方案范围。
 
 ---
