@@ -6,7 +6,9 @@
 
 #include "onnxruntime_cxx_api.h"
 
-#include "src/backend/base/i_backend.h"#include "src/backend/base/i_backend_context.h"#include "src/core/manifest_config.h"
+#include "src/backend/base/i_backend.h"
+#include "src/backend/base/i_backend_context.h"
+#include "src/core/manifest_config.h"
 #include "src/utils/types.h"
 
 namespace atlas {

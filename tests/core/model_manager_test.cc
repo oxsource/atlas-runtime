@@ -1,5 +1,4 @@
 #include <cstdlib>
-#include <cstring>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -21,7 +20,7 @@ namespace {
 // Helpers
 // ---------------------------------------------------------------------------
 
-constexpr std::string_view kModelFile = "identity_1x3x4x4.onnx";
+// ---------------------------------------------------------------------------
 
 std::string TestModelPath() {
     const std::string rel = "tests/backend/cpu/test_data/identity_1x3x4x4.onnx";
@@ -71,20 +70,6 @@ ManifestConfig MakeManifest(bool two_models = false,
         manifest.models.push_back(m2);
     }
     return manifest;
-}
-
-// Returns a float32 Tensor with shape [N,C,H,W] filled with |fill|.
-utils::Tensor MakeFloatTensor(int n, int c, int h, int w, float fill) {
-    utils::Tensor t;
-    t.info.dtype  = utils::DataType::kFloat32;
-    t.info.shape  = {n, c, h, w};
-    t.info.layout = "NCHW";
-    t.byte_size   = static_cast<size_t>(n * c * h * w) * sizeof(float);
-    t.data        = malloc(t.byte_size);
-    t.owns_data   = true;
-    float* p = static_cast<float*>(t.data);
-    for (size_t i = 0; i < t.byte_size / sizeof(float); ++i) p[i] = fill;
-    return t;
 }
 
 // ---------------------------------------------------------------------------
