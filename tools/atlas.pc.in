@@ -1,0 +1,12 @@
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: Atlas
+Description: Visual model runtime framework with multi-backend support
+Version: 1.0.0
+URL: https://github.com/<org>/atlas
+Libs: -L${libdir} -latlas
+Libs.private: -L${libdir}/atlas -lonnxruntime
+Cflags: -I${includedir} -std=c++17

@@ -10,14 +10,18 @@
 namespace atlas {
 namespace api {
 
-AtlasRuntime::AtlasRuntime() = default;
+AtlasRuntime::AtlasRuntime()
+    : parser_(std::make_unique<core::ManifestParser>()) {}
 AtlasRuntime::~AtlasRuntime() { Release(); }
 
 utils::ErrorCode AtlasRuntime::Init(const std::string& manifest_path) {
     Release();
 
+    // Re-create parser if it was reset (e.g. after move).
+    if (!parser_) parser_ = std::make_unique<core::ManifestParser>();
+
     core::ManifestConfig manifest;
-    auto ret = parser_.Parse(manifest_path, &manifest);
+    auto ret = parser_->Parse(manifest_path, &manifest);
     if (ret != utils::ErrorCode::kOk) return ret;
 
     manager_ = std::make_unique<core::ModelManager>();

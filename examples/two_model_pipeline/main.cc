@@ -4,12 +4,7 @@
 #include <iostream>
 #include <vector>
 
-#include "src/api/atlas_runtime.h"
-#include "src/api/model_handle.h"
-#include "src/backend/cpu/cpu_backend.h"
-#include "src/backend/cpu/cpu_backend_context.h"
-#include "src/utils/types.h"
-#include "src/utils/version.h"
+#include "atlas/atlas.h"
 
 namespace {
 

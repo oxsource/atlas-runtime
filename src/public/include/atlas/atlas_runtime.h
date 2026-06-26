@@ -3,8 +3,9 @@
 #include <memory>
 #include <string>
 
-#include "src/api/model_handle.h"
-#include "src/utils/types.h"
+#include "atlas/atlas_export.h"
+#include "atlas/model_handle.h"
+#include "atlas/types.h"
 
 namespace atlas {
 namespace core { class ModelManager; class ManifestParser; }
@@ -46,6 +47,7 @@ class AtlasRuntime {
     bool IsInitialized() const { return initialized_; }
 
  private:
+    // PIMPL: internal parser and manager are hidden from the public header.
     std::unique_ptr<core::ManifestParser> parser_;
     std::unique_ptr<core::ModelManager>   manager_;
     bool                                  initialized_ = false;

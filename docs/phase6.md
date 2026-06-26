@@ -1,9 +1,9 @@
 # 阶段六实现方案：对外提供库及接口
 
-> **文档版本**：1.0.0
-> **对应代码版本**：—
+> **文档版本**：1.0.1
+> **对应代码版本**：v1.0.0
 > **最后更新**：2026-06-26
-> **状态**：评审中
+> **状态**：已实现
 
 ## 一、目标与交付物
 
@@ -17,7 +17,7 @@
 | `atlas.bzl` 集成宏 | 简化外部 Bazel 项目引入 Atlas 的工作量 |
 | `tools/install_atlas.sh` 安装脚本 | 将头文件、库文件、运行时依赖安装到指定前缀 |
 | `atlas.pc` pkg-config 模板 | 供非 Bazel 项目（CMake / Makefile）集成使用 |
-| 集成示例 `examples/external_consumer` | 演示外部项目如何链接 Atlas 并运行推理 |
+| 集成示例 `examples/two_model_pipeline`（改造为公共 API） | 演示仅通过公共 API 链接 Atlas 并运行双模型推理 |
 | 集成指南文档 | README 中补充「作为依赖使用」章节 |
 
 ### 设计原则
@@ -638,80 +638,37 @@ target_compile_features(my_app PRIVATE cxx_std_17)
 
 ## 八、集成示例
 
-### 8.1 目录结构
+> **【补充】** 实现阶段 | 2026-06-26 | 文档版本 1.0.0 → 1.0.1
+> 原设计为独立 `examples/external_consumer/`，实现时合并到 `examples/two_model_pipeline/` 中，保留双模型验证场景的同时改用公共 API。
 
-```
-examples/
-└── external_consumer/
-    ├── BUILD
-    ├── README.md
-    ├── manifest.json
-    ├── main.cc
-    └── gen_models.py   # 复用 two_model_pipeline 的模型生成逻辑
-```
+### 8.1 改造说明
 
-### 8.2 示例主程序
+`examples/two_model_pipeline/main.cc` 从依赖内部头文件改为仅使用公共 API：
 
+**改造前（内部头文件）：**
 ```cpp
-// Demonstrates the Atlas public API as consumed by an external project.
-// Note: all includes use the "atlas/" prefix from the public include root.
-// No internal headers (src/...) are referenced.
-
-#include <iostream>
-#include <vector>
-
-#include "atlas/atlas.h"
-
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << "Usage: external_consumer <manifest_path>\n";
-        return 1;
-    }
-
-    std::cout << "Atlas version: " << atlas::utils::VersionString() << "\n";
-
-    atlas::api::AtlasRuntime runtime;
-    auto ret = runtime.Init(argv[1]);
-    if (ret != atlas::utils::ErrorCode::kOk) {
-        std::cerr << "Init failed: "
-                  << atlas::utils::ErrorCodeToString(ret) << "\n";
-        return 1;
-    }
-
-    auto handle = runtime.GetModel("detector");
-    if (!handle.IsValid()) {
-        std::cerr << "Model not found\n";
-        return 1;
-    }
-
-    // Build a dummy input tensor and run inference.
-    atlas::utils::Tensor input;
-    input.info.dtype   = atlas::utils::DataType::kUInt8;
-    input.info.shape   = {32, 32, 3};
-    input.info.layout  = "HWC";
-    input.byte_size    = 32 * 32 * 3;
-    input.data         = std::malloc(input.byte_size);
-    input.owns_data    = true;
-
-    std::vector<atlas::utils::Tensor> outputs;
-    ret = handle.Run(input, &outputs);
-    std::cout << "Inference: " << atlas::utils::ErrorCodeToString(ret) << "\n";
-    std::cout << "Outputs: " << outputs.size() << "\n";
-
-    runtime.Release();
-    return 0;
-}
+#include "src/api/atlas_runtime.h"
+#include "src/api/model_handle.h"
+#include "src/backend/cpu/cpu_backend.h"
+#include "src/backend/cpu/cpu_backend_context.h"
+#include "src/utils/types.h"
+#include "src/utils/version.h"
 ```
 
-### 8.3 BUILD 文件
+**改造后（公共 API）：**
+```cpp
+#include "atlas/atlas.h"
+```
 
+**BUILD 文件改造：**
 ```python
-# examples/external_consumer/BUILD
-# This target depends ONLY on the public //src/public:atlas target,
-# simulating how an external project would consume Atlas.
+# examples/two_model_pipeline/BUILD
+# This example uses ONLY the public //src/public:atlas target,
+# demonstrating how an external project would consume Atlas.
+# No internal headers (src/...) are referenced.
 
 cc_binary(
-    name = "external_consumer",
+    name = "two_model_pipeline",
     srcs = ["main.cc"],
     data = ["manifest.json"],
     deps = [
@@ -720,7 +677,7 @@ cc_binary(
 )
 ```
 
-> **验证点**：该示例**不**直接依赖 `//src/api`、`//src/backend/cpu` 等内部目标，证明公共库目标已自包含全部所需实现。
+> **验证点**：该示例**不**直接依赖 `//src/api`、`//src/backend/cpu` 等内部目标，证明公共库目标已自包含全部所需实现。同时保留了双模型（detector + classifier）推理验证，覆盖 eager/lazy 加载策略与共享 BackendContext 场景。
 
 ---
 
@@ -767,7 +724,7 @@ atlas/
 │   └── check_abi.sh                      # ABI 检查（可选）
 ├── atlas_deps.bzl                        # 外部项目依赖传递宏
 ├── examples/
-│   └── external_consumer/                # 集成示例
+│   └── two_model_pipeline/             # 已改造为公共 API（双模型推理 + 公共库验证）
 │       ├── BUILD
 │       ├── README.md
 │       ├── manifest.json
@@ -785,7 +742,7 @@ atlas/
 | `tests/public/atlas_lib_test.cc` | 验证 `//src/public:atlas` 目标可被独立链接，`AtlasRuntime::Init` 后 `BackendFactory` 中存在 `"cpu"` 后端（验证 alwayslink 锚点生效） |
 | `tests/public/atlas_export_test.cc` | 验证公共头文件可被仅 include `atlas/atlas.h` 编译通过，无遗漏的类型引用 |
 | `tests/public/abi_smoke_test.cc` | 基础 ABI 烟雾测试：sizeof 关键类型、枚举值不变（防止意外修改布局） |
-| `examples/external_consumer` | 作为集成测试，验证 `bazel build //examples/external_consumer` 通过且运行正常 |
+| `examples/two_model_pipeline`（公共 API 改造后） | 作为集成测试，验证 `bazel build //examples/two_model_pipeline` 通过且运行正常 |
 
 ---
 
@@ -796,7 +753,7 @@ atlas/
 | `bazel build //src/public:libatlas.so` 成功 | 产出可加载的共享库 |
 | `nm -D libatlas.so \| grep atlas` 验证符号导出 | 仅 `ATLAS_API` 标记的符号可见，内部符号隐藏 |
 | `ldd libatlas.so`（Linux）/ `otool -L libatlas.dylib`（macOS） | 仅依赖 `libonnxruntime` 与系统库 |
-| `examples/external_consumer` 构建运行通过 | 证明公共 API 自包含 |
+| `examples/two_model_pipeline` 构建运行通过 | 证明公共 API 自包含（仅依赖 `//src/public:atlas`） |
 | `tools/install_atlas.sh` 执行成功 | 头文件 / 库文件 / pkg-config 安装到指定前缀 |
 | pkg-config 验证 `pkg-config --cflags --libs atlas` | 输出正确的编译 / 链接选项 |
 | 公共头文件无 `src/` 路径 include | `grep -r 'src/' include/` 无结果 |
@@ -836,3 +793,32 @@ atlas/
 
 6. **静态库是否在本阶段交付**：嵌入式场景可能需要 `libatlas.a`，但 Bazel 产出的静态库会包含三方库 `.o`，体积与许可需评估。
    - **建议**：本阶段仅交付共享库，静态库作为可选项在实现时验证可行性。
+
+---
+
+## 十五、实现与设计的差异说明
+
+> **【补充】** 实现阶段 | 2026-06-26 | 文档版本 1.0.0 → 1.0.1
+> 以下差异在实现过程中确认，非原始设计的一部分。
+
+### 15.1 SONAME / install_name 未在 cc_library 中设置
+
+**设计**：在 `cc_library` 的 `linkopts` 中设置 `-Wl,-soname,libatlas.so.1` / `-Wl,-install_name,@rpath/libatlas.1.dylib`。
+
+**实际**：移除了 `linkopts` 中的 SONAME 设置。原因：自定义 `install_name` 会破坏 Bazel 沙箱的 RPATH 解析，导致测试运行时找不到动态库。SONAME 改由安装脚本 (`tools/install_atlas.sh`) 在发布时通过 `install_name_tool` 设置。
+
+### 15.2 公共头文件中的 ATLAS_API 装饰简化
+
+**设计**：所有公共类和函数添加 `ATLAS_API` 宏装饰。
+
+**实际**：`AtlasRuntime`、`ModelHandle`、`Tensor` 类及 `DataType`/`ErrorCode` 枚举未添加 `ATLAS_API`。原因：这些类型的实现位于 deps 的 `.cc` 文件中（如 `src/api/atlas_runtime.cc`），编译时未定义 `ATLAS_SHARED_LIBRARY`，`ATLAS_API` 为空宏。在类声明上添加 `ATLAS_API` 不会产生实际导出效果，反而可能造成 ABI 误导。
+
+内联辅助函数（`ErrorCodeToString`、`ElementByteSize`、`ElementCount`）在公共头文件中保持 `inline` 实现（与内部 `types.h` 一致），不使用 `ATLAS_API` 导出。这避免了符号解析问题。
+
+`atlas_export.h` 仍然保留，供后续需要显式控制符号导出的场景使用。
+
+### 15.3 cc_binary(linkshared=True) 目标移除
+
+**设计**：提供 `cc_binary(name = "libatlas.so", linkshared = True)` 专用目标。
+
+**实际**：移除了该目标。原因：`cc_library` 已经产出共享库（macOS 上为 `libatlas.dylib`），`cc_binary` 与其输出路径冲突。直接使用 `bazel build //src/public:atlas` 即可获取共享库产物。

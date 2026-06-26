@@ -214,6 +214,8 @@ utils::ErrorCode ParseModelConfig(const nlohmann::json& j,
         const auto val = j[kKeyLoadStrategy].get<std::string>();
         if (val == kLoadStrategyLazy) {
             model->load_strategy = LoadStrategy::kLazy;
+        } else if (val == kLoadStrategyEager) {
+            model->load_strategy = LoadStrategy::kEager;
         } else {
             model->load_strategy = LoadStrategy::kEager;
         }
