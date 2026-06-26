@@ -16,3 +16,18 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "model_manager",
+    srcs = ["model_manager.cc"],
+    hdrs = ["model_manager.h"],
+    deps = [
+        ":manifest_config",
+        "//src/backend/base:backend_factory",
+        "//src/backend/base:i_backend",
+        "//src/backend/base:i_backend_context",
+        "//src/pipeline:pipeline",
+        "//src/utils:types",
+    ],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "name": "test-multi-model",
+  "models": [
+    {
+      "id": "model_a",
+      "name": "Identity A",
+      "backend": "cpu",
+      "model_path": "__MODEL_PATH__",
+      "load_strategy": "eager",
+      "inputs": [
+        {
+          "name": "images",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32"
+        }
+      ],
+      "config": { "num_threads": "1" }
+    },
+    {
+      "id": "model_b",
+      "name": "Identity B",
+      "backend": "cpu",
+      "model_path": "__MODEL_PATH__",
+      "load_strategy": "lazy",
+      "inputs": [
+        {
+          "name": "images",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32"
+        }
+      ],
+      "config": { "num_threads": "1" }
+    }
+  ]
+}

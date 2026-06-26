@@ -3,15 +3,18 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "src/backend/base/i_backend.h"
+#include "src/backend/base/i_backend_context.h"
 
 namespace atlas {
 namespace backend {
 
-// Factory function type used to create IBackend instances.
-using BackendCreator = std::function<std::unique_ptr<IBackend>()>;
+// Factory function types.
+using BackendCreator        = std::function<std::unique_ptr<IBackend>()>;
+using BackendContextCreator = std::function<std::unique_ptr<IBackendContext>()>;
 
 // Singleton registry that maps backend name strings to creator functions.
 //
@@ -35,13 +38,25 @@ class BackendFactory {
     // Returns a sorted list of all registered backend names.
     std::vector<std::string> ListBackends() const;
 
+    // Registers a context creator for |name|.  Called via
+    // ATLAS_REGISTER_BACKEND_CONTEXT.  If |name| is already registered,
+    // the previous entry is replaced.
+    void RegisterContext(const std::string& name,
+                          BackendContextCreator creator);
+
+    // Creates a new shared context for |name|.
+    // Returns nullptr if no context creator is registered for |name|.
+    std::unique_ptr<IBackendContext> CreateContext(
+        const std::string& name) const;
+
  private:
     BackendFactory() = default;
     ~BackendFactory() = default;
     BackendFactory(const BackendFactory&) = delete;
     BackendFactory& operator=(const BackendFactory&) = delete;
 
-    std::unordered_map<std::string, BackendCreator> creators_;
+    std::unordered_map<std::string, BackendCreator>        creators_;
+    std::unordered_map<std::string, BackendContextCreator> context_creators_;
 };
 
 // Convenience macro for registering a backend from its own translation unit.
@@ -65,6 +80,21 @@ class BackendFactory {
 
 #define ATLAS_REGISTER_BACKEND(name, cls)  \
     ATLAS_REGISTER_BACKEND_IMPL_(name, cls, __COUNTER__)
+
+// Registers a context creator.  Use at the end of a backend context .cc file.
+// Example:
+//   ATLAS_REGISTER_BACKEND_CONTEXT("cpu", atlas::backend::CpuBackendContext)
+#define ATLAS_REGISTER_BACKEND_CONTEXT_IMPL_(name, ctx_cls, counter)         \
+    namespace {                                                                \
+    const bool kAtlasCtxRegistered_##counter = []() {                        \
+        ::atlas::backend::BackendFactory::Instance().RegisterContext(          \
+            name, []() { return std::make_unique<ctx_cls>(); });              \
+        return true;                                                           \
+    }();                                                                       \
+    }  /* namespace */
+
+#define ATLAS_REGISTER_BACKEND_CONTEXT(name, ctx_cls) \
+    ATLAS_REGISTER_BACKEND_CONTEXT_IMPL_(name, ctx_cls, __COUNTER__)
 
 }  // namespace backend
 }  // namespace atlas

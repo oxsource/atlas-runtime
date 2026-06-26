@@ -1,3 +1,9 @@
+filegroup(
+    name = "test_models",
+    srcs = glob(["test_data/**"]),
+    visibility = ["//visibility:public"],
+)
+
 cc_test(
     name = "cpu_backend_test",
     srcs = ["cpu_backend_test.cc"],

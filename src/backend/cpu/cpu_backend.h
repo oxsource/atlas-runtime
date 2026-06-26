@@ -6,8 +6,7 @@
 
 #include "onnxruntime_cxx_api.h"
 
-#include "src/backend/base/i_backend.h"
-#include "src/core/manifest_config.h"
+#include "src/backend/base/i_backend.h"#include "src/backend/base/i_backend_context.h"#include "src/core/manifest_config.h"
 #include "src/utils/types.h"
 
 namespace atlas {
@@ -21,7 +20,8 @@ class CpuBackend : public IBackend {
     ~CpuBackend() override;
 
     utils::ErrorCode Load(const std::string& model_path,
-                           const core::ModelConfig& config) override;
+                           const core::ModelConfig& config,
+                           IBackendContext* ctx = nullptr) override;
 
     utils::ErrorCode Infer(const std::vector<utils::Tensor>& inputs,
                             std::vector<utils::Tensor>& outputs) override;
@@ -40,7 +40,10 @@ class CpuBackend : public IBackend {
     // Converts an ONNX Runtime element type to atlas DataType.
     static utils::DataType OrtDtypeToAtlas(ONNXTensorElementDataType ort_type);
 
-    std::unique_ptr<Ort::Env>     env_;
+    // Owned fallback Env (created when ctx == nullptr).
+    std::unique_ptr<Ort::Env>     own_env_;
+    // Non-owning pointer to the active Env (either own_env_ or shared).
+    Ort::Env*                     active_env_ = nullptr;
     std::unique_ptr<Ort::Session> session_;
     Ort::AllocatorWithDefaultOptions allocator_;
 

@@ -55,12 +55,17 @@ constexpr const char* kKeyName    = "name";
 constexpr const char* kKeyModels  = "models";
 
 // Model-level keys
-constexpr const char* kKeyId        = "id";
-constexpr const char* kKeyBackend   = "backend";
-constexpr const char* kKeyModelPath = "model_path";
-constexpr const char* kKeyInputs    = "inputs";
-constexpr const char* kKeyOutputs   = "outputs";
-constexpr const char* kKeyConfig    = "config";
+constexpr const char* kKeyId           = "id";
+constexpr const char* kKeyBackend      = "backend";
+constexpr const char* kKeyModelPath    = "model_path";
+constexpr const char* kKeyLoadStrategy = "load_strategy";
+constexpr const char* kKeyInputs       = "inputs";
+constexpr const char* kKeyOutputs      = "outputs";
+constexpr const char* kKeyConfig       = "config";
+
+// load_strategy values
+constexpr std::string_view kLoadStrategyLazy  = "lazy";
+constexpr std::string_view kLoadStrategyEager = "eager";
 
 // Tensor-level keys
 constexpr const char* kKeyShape     = "shape";
@@ -202,6 +207,16 @@ utils::ErrorCode ParseModelConfig(const nlohmann::json& j,
 
     if (j.contains(kKeyName) && j[kKeyName].is_string()) {
         model->name = j[kKeyName].get<std::string>();
+    }
+
+    // Optional: load_strategy (default: eager)
+    if (j.contains(kKeyLoadStrategy) && j[kKeyLoadStrategy].is_string()) {
+        const auto val = j[kKeyLoadStrategy].get<std::string>();
+        if (val == kLoadStrategyLazy) {
+            model->load_strategy = LoadStrategy::kLazy;
+        } else {
+            model->load_strategy = LoadStrategy::kEager;
+        }
     }
 
     if (!j.contains(kKeyInputs) || !j[kKeyInputs].is_array()) {

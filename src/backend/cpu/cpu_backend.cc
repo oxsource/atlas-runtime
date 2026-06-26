@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "src/backend/base/backend_factory.h"
+#include "src/backend/cpu/cpu_backend_context.h"
 #include "src/utils/types.h"
 
 namespace atlas {
@@ -43,7 +44,8 @@ CpuBackend::~CpuBackend() { Unload(); }
 // ---------------------------------------------------------------------------
 
 utils::ErrorCode CpuBackend::Load(const std::string& model_path,
-                                   const core::ModelConfig& config) {
+                                   const core::ModelConfig& config,
+                                   IBackendContext* ctx) {
     Unload();
 
     // Resolve num_threads from per-model config, fall back to default.
@@ -58,19 +60,27 @@ utils::ErrorCode CpuBackend::Load(const std::string& model_path,
     }
 
     try {
-        env_ = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING,
-                                           kOrtLoggerName);
+        if (ctx != nullptr) {
+            // Borrow the shared Env from the provided context.
+            active_env_ = &static_cast<CpuBackendContext*>(ctx)->GetEnv();
+        } else {
+            // Fallback: create a private Env (standalone / test usage).
+            own_env_    = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING,
+                                                      kOrtLoggerName);
+            active_env_ = own_env_.get();
+        }
 
         Ort::SessionOptions opts;
         opts.SetIntraOpNumThreads(num_threads);
         opts.SetGraphOptimizationLevel(
             GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 
-        session_ = std::make_unique<Ort::Session>(*env_,
+        session_ = std::make_unique<Ort::Session>(*active_env_,
                                                    model_path.c_str(),
                                                    opts);
-    } catch (const Ort::Exception& e) {
-        env_.reset();
+    } catch (const Ort::Exception&) {
+        own_env_.reset();
+        active_env_ = nullptr;
         session_.reset();
         return utils::ErrorCode::kInvalidArgument;
     }
@@ -193,7 +203,8 @@ std::vector<utils::TensorInfo> CpuBackend::GetOutputInfo() const {
 
 void CpuBackend::Unload() {
     session_.reset();
-    env_.reset();
+    own_env_.reset();
+    active_env_ = nullptr;
     input_names_.clear();
     output_names_.clear();
     input_info_.clear();

@@ -11,3 +11,18 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "model_manager_test",
+    srcs = ["model_manager_test.cc"],
+    data = ["//tests/backend/cpu:test_models"],
+    deps = [
+        "//src/backend/base:backend_factory",
+        "//src/backend/cpu:cpu_backend",
+        "//src/backend/cpu:cpu_backend_context",
+        "//src/core:manifest_config",
+        "//src/core:model_manager",
+        "//src/utils:types",
+        "@googletest//:gtest_main",
+    ],
+)

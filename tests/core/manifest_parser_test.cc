@@ -184,7 +184,8 @@ TEST_F(ManifestParserTest, ReturnsInvalidArgumentForUndefinedEnvVar) {
 class StubBackend : public backend::IBackend {
  public:
     utils::ErrorCode Load(const std::string&,
-                           const core::ModelConfig&) override {
+                           const core::ModelConfig&,
+                           backend::IBackendContext*) override {
         loaded_ = true;
         return utils::ErrorCode::kOk;
     }

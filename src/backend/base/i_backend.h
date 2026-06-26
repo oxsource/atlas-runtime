@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "src/backend/base/i_backend_context.h"
 #include "src/core/manifest_config.h"
 #include "src/utils/types.h"
 
@@ -20,11 +21,15 @@ class IBackend {
     virtual ~IBackend() = default;
 
     // Loads the model from |model_path| using the options in |config|.
-    // Must be called before Infer().
+    // |ctx| is an optional shared backend-type context (e.g. CpuBackendContext
+    // holding Ort::Env).  Implementations should cast ctx to their concrete
+    // type.  Passing nullptr is valid; backends fall back to creating their
+    // own internal runtime resource.
     //
     // @return kOk on success; kInvalidArgument or kInferFailed on failure.
     virtual utils::ErrorCode Load(const std::string& model_path,
-                                   const core::ModelConfig& config) = 0;
+                                   const core::ModelConfig& config,
+                                   IBackendContext* ctx = nullptr) = 0;
 
     // Runs one synchronous inference pass.
     // |inputs| and |outputs| must be pre-allocated by the caller.

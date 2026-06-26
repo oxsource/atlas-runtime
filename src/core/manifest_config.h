@@ -9,6 +9,12 @@
 namespace atlas {
 namespace core {
 
+// Model loading strategy declared in the manifest.
+enum class LoadStrategy {
+    kEager = 0,  // Load at ModelManager::Init() time (default).
+    kLazy,       // Load on first ModelHandle::Run() call.
+};
+
 // Holds all configuration for a single model entry in the manifest.
 // model_path has already had environment variables expanded.
 struct ModelConfig {
@@ -16,6 +22,7 @@ struct ModelConfig {
     std::string name;
     std::string backend;
     std::string model_path;
+    LoadStrategy load_strategy = LoadStrategy::kEager;
     std::vector<utils::TensorInfo> inputs;
     std::vector<utils::TensorInfo> outputs;
     // Backend-specific key-value options declared under "config" in the manifest.
