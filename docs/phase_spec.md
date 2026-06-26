@@ -156,6 +156,9 @@ docs/
 ├── phase1_result.md         # 阶段一结果汇总
 ├── phase2.md                # 阶段二设计方案
 ├── phase2_result.md         # 阶段二结果汇总
+├── phase3.md                # 阶段三设计方案
+├── phase3_result.md         # 阶段三结果汇总
+├── phase5.md                # 阶段五设计方案（示例 + 基准测试 + 发布）
 └── phase{N}.md / result.md  # 后续阶段依此类推
 ```
 
