@@ -2,7 +2,11 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <sstream>
+#include <string>
 
+#include "src/pipeline/pipeline_node_factory.h"
 #include "src/utils/types.h"
 
 namespace atlas {
@@ -57,5 +61,43 @@ utils::ErrorCode NormalizeNode::Process(const utils::Tensor& input,
     return utils::ErrorCode::kOk;
 }
 
+namespace {
+
+// Parses a comma-separated list of floats from |s| into |out|.
+// Returns false on parse error.
+bool ParseFloatList(const std::string& s, std::vector<float>* out) {
+    out->clear();
+    std::stringstream ss(s);
+    std::string token;
+    while (std::getline(ss, token, ',')) {
+        try {
+            out->push_back(std::stof(token));
+        } catch (...) {
+            return false;
+        }
+    }
+    return !out->empty();
+}
+
+}  // namespace
+
+// static
+std::unique_ptr<IPipelineNode> NormalizeNode::CreateFromParams(
+    const std::unordered_map<std::string, std::string>& params) {
+    auto mean_it = params.find("mean");
+    auto std_it  = params.find("std");
+    if (mean_it == params.end() || std_it == params.end()) return nullptr;
+
+    std::vector<float> mean;
+    std::vector<float> std_dev;
+    if (!ParseFloatList(mean_it->second, &mean)) return nullptr;
+    if (!ParseFloatList(std_it->second, &std_dev)) return nullptr;
+    if (mean.size() != std_dev.size()) return nullptr;
+
+    return std::make_unique<NormalizeNode>(mean, std_dev);
+}
+
 }  // namespace pipeline
 }  // namespace atlas
+
+ATLAS_REGISTER_PIPELINE_NODE("normalize", atlas::pipeline::NormalizeNode)

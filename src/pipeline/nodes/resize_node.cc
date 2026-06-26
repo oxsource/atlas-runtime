@@ -2,7 +2,10 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <string>
 
+#include "src/pipeline/pipeline_node_factory.h"
 #include "src/utils/types.h"
 
 namespace atlas {
@@ -137,5 +140,22 @@ utils::ErrorCode ResizeNode::Process(const utils::Tensor& input,
     return utils::ErrorCode::kOk;
 }
 
+// static
+std::unique_ptr<IPipelineNode> ResizeNode::CreateFromParams(
+    const std::unordered_map<std::string, std::string>& params) {
+    auto h_it = params.find("height");
+    auto w_it = params.find("width");
+    if (h_it == params.end() || w_it == params.end()) return nullptr;
+    try {
+        const int height = std::stoi(h_it->second);
+        const int width  = std::stoi(w_it->second);
+        return std::make_unique<ResizeNode>(height, width);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 }  // namespace pipeline
 }  // namespace atlas
+
+ATLAS_REGISTER_PIPELINE_NODE("resize", atlas::pipeline::ResizeNode)

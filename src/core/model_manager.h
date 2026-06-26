@@ -18,7 +18,8 @@ namespace core {
 struct ModelEntry {
     ModelConfig                            config;
     std::unique_ptr<backend::IBackend>     backend;
-    pipeline::Pipeline                     pipeline;
+    std::vector<pipeline::Pipeline>        input_pipelines;   // one per input
+    std::vector<pipeline::Pipeline>        output_pipelines;  // one per output
     bool                                   loaded = false;
 };
 

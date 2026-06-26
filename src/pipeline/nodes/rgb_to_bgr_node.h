@@ -10,16 +10,16 @@
 namespace atlas {
 namespace pipeline {
 
-// Converts a 3-D tensor from HWC layout (H × W × C) to CHW layout (C × H × W).
-// The output shape is updated accordingly.
-// Supports float32 and uint8 inputs.
-class HWCToCHWNode : public IPipelineNode {
+// Swaps channel 0 and channel 2 of a HWC tensor (RGB → BGR).
+// Supports float32 and uint8 inputs.  Operates in-place.
+class RGBToBGRNode : public IPipelineNode {
  public:
-    HWCToCHWNode() = default;
+    RGBToBGRNode() = default;
 
     utils::ErrorCode Process(const utils::Tensor& input,
                               utils::Tensor* output) override;
     std::string_view Name() const override;
+    bool SupportsInPlace() const override { return true; }
 
     // Creates a node from manifest params. No params required.
     static std::unique_ptr<IPipelineNode> CreateFromParams(

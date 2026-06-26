@@ -3,7 +3,6 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 #include "src/pipeline/pipeline_node.h"
 #include "src/utils/types.h"
@@ -11,16 +10,18 @@
 namespace atlas {
 namespace pipeline {
 
-// Per-channel normalization for float32 tensors in CHW layout.
+// Applies softmax to a float32 tensor along a configurable axis
+// (default -1, meaning the last dimension).
 //
-// Formula applied to each element of channel c:
-//   output[c][h][w] = (input[c][h][w] / 255.0f - mean[c]) / std[c]
+// For a 1-D tensor, softmax is computed over the entire flat array.
+// For multi-dimensional tensors, softmax is computed independently
+// along the specified axis.
 //
-// The division by 255 converts from the [0, 255] range produced by
-// DtypeConvertNode into [0, 1] before subtracting the mean.
-class NormalizeNode : public IPipelineNode {
+// Supports in-place operation.
+class SoftmaxNode : public IPipelineNode {
  public:
-    NormalizeNode(const std::vector<float>& mean, const std::vector<float>& std);
+    // |axis| follows NumPy semantics: negative values count from the end.
+    explicit SoftmaxNode(int axis = -1);
 
     utils::ErrorCode Process(const utils::Tensor& input,
                               utils::Tensor* output) override;
@@ -28,14 +29,12 @@ class NormalizeNode : public IPipelineNode {
     bool SupportsInPlace() const override { return true; }
 
     // Creates a node from manifest params.
-    // Required keys: "mean" and "std", each a comma-separated list of floats.
-    // Returns nullptr if either key is missing or unparseable.
+    // Optional key: "axis" (int, default -1 = last dimension).
     static std::unique_ptr<IPipelineNode> CreateFromParams(
         const std::unordered_map<std::string, std::string>& params);
 
  private:
-    std::vector<float> mean_;
-    std::vector<float> std_;
+    int axis_;
 };
 
 }  // namespace pipeline

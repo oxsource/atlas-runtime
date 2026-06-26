@@ -3,7 +3,10 @@
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <string>
 
+#include "src/pipeline/pipeline_node_factory.h"
 #include "src/utils/types.h"
 
 namespace atlas {
@@ -57,5 +60,27 @@ utils::ErrorCode DtypeConvertNode::Process(const utils::Tensor& input,
     return utils::ErrorCode::kOk;
 }
 
+// static
+std::unique_ptr<IPipelineNode> DtypeConvertNode::CreateFromParams(
+    const std::unordered_map<std::string, std::string>& params) {
+    auto it = params.find("target");
+    if (it == params.end()) return nullptr;
+    if (it->second == "float32") {
+        return std::make_unique<DtypeConvertNode>(utils::DataType::kFloat32);
+    }
+    if (it->second == "uint8") {
+        return std::make_unique<DtypeConvertNode>(utils::DataType::kUInt8);
+    }
+    if (it->second == "int8") {
+        return std::make_unique<DtypeConvertNode>(utils::DataType::kInt8);
+    }
+    if (it->second == "int32") {
+        return std::make_unique<DtypeConvertNode>(utils::DataType::kInt32);
+    }
+    return nullptr;
+}
+
 }  // namespace pipeline
 }  // namespace atlas
+
+ATLAS_REGISTER_PIPELINE_NODE("dtype_convert", atlas::pipeline::DtypeConvertNode)

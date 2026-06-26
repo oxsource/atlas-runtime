@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <unordered_map>
+
 #include "src/pipeline/pipeline_node.h"
 #include "src/utils/types.h"
 
@@ -16,6 +20,12 @@ class ResizeNode : public IPipelineNode {
     utils::ErrorCode Process(const utils::Tensor& input,
                               utils::Tensor* output) override;
     std::string_view Name() const override;
+
+    // Creates a node from manifest params.
+    // Required keys: "height" (int), "width" (int).
+    // Returns nullptr if either key is missing or unparseable.
+    static std::unique_ptr<IPipelineNode> CreateFromParams(
+        const std::unordered_map<std::string, std::string>& params);
 
  private:
     int target_h_;

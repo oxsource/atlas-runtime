@@ -19,12 +19,18 @@ utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
     if (outputs == nullptr) return utils::ErrorCode::kInvalidArgument;
     if (!IsValid())         return utils::ErrorCode::kNotInitialized;
 
-    // Step 1: run preprocessing pipeline.
+    // Run preprocessing pipeline for the first input.
     utils::Tensor preprocessed;
-    auto ret = entry_->pipeline.Run(raw_input, &preprocessed);
-    if (ret != utils::ErrorCode::kOk) return ret;
+    if (!entry_->input_pipelines.empty()) {
+        auto ret = entry_->input_pipelines[0].Run(raw_input, &preprocessed);
+        if (ret != utils::ErrorCode::kOk) return ret;
+    } else {
+        preprocessed.info      = raw_input.info;
+        preprocessed.data      = raw_input.data;
+        preprocessed.byte_size = raw_input.byte_size;
+        preprocessed.owns_data = false;
+    }
 
-    // Step 2: prepare inputs vector and run inference.
     std::vector<utils::Tensor> inputs;
     // Add batch dimension to shape if pipeline output is 3-D (C×H×W).
     if (preprocessed.info.shape.size() == 3) {
@@ -33,7 +39,72 @@ utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
     }
     inputs.push_back(std::move(preprocessed));
 
-    return entry_->backend->Infer(inputs, *outputs);
+    std::vector<utils::Tensor> raw_outputs;
+    auto ret = entry_->backend->Infer(inputs, raw_outputs);
+    if (ret != utils::ErrorCode::kOk) return ret;
+
+    // Run output pipelines.
+    outputs->clear();
+    for (size_t i = 0; i < raw_outputs.size(); ++i) {
+        if (i < entry_->output_pipelines.size() &&
+            !entry_->output_pipelines[i].IsEmpty()) {
+            utils::Tensor postprocessed;
+            ret = entry_->output_pipelines[i].Run(raw_outputs[i], &postprocessed);
+            if (ret != utils::ErrorCode::kOk) return ret;
+            outputs->push_back(std::move(postprocessed));
+        } else {
+            outputs->push_back(std::move(raw_outputs[i]));
+        }
+    }
+    return utils::ErrorCode::kOk;
+}
+
+utils::ErrorCode ModelHandle::Run(const std::vector<utils::Tensor>& raw_inputs,
+                                   std::vector<utils::Tensor>* outputs) {
+    if (outputs == nullptr) return utils::ErrorCode::kInvalidArgument;
+    if (!IsValid())         return utils::ErrorCode::kNotInitialized;
+
+    std::vector<utils::Tensor> preprocessed;
+    preprocessed.reserve(raw_inputs.size());
+
+    for (size_t i = 0; i < raw_inputs.size(); ++i) {
+        utils::Tensor processed;
+        if (i < entry_->input_pipelines.size() &&
+            !entry_->input_pipelines[i].IsEmpty()) {
+            auto ret = entry_->input_pipelines[i].Run(raw_inputs[i], &processed);
+            if (ret != utils::ErrorCode::kOk) return ret;
+        } else {
+            processed.info      = raw_inputs[i].info;
+            processed.data      = raw_inputs[i].data;
+            processed.byte_size = raw_inputs[i].byte_size;
+            processed.owns_data = false;
+        }
+        // Add batch dimension to shape if pipeline output is 3-D (C×H×W).
+        if (processed.info.shape.size() == 3) {
+            processed.info.shape.insert(
+                processed.info.shape.begin(), 1);
+        }
+        preprocessed.push_back(std::move(processed));
+    }
+
+    std::vector<utils::Tensor> raw_outputs;
+    auto ret = entry_->backend->Infer(preprocessed, raw_outputs);
+    if (ret != utils::ErrorCode::kOk) return ret;
+
+    // Run output pipelines.
+    outputs->clear();
+    for (size_t i = 0; i < raw_outputs.size(); ++i) {
+        if (i < entry_->output_pipelines.size() &&
+            !entry_->output_pipelines[i].IsEmpty()) {
+            utils::Tensor postprocessed;
+            ret = entry_->output_pipelines[i].Run(raw_outputs[i], &postprocessed);
+            if (ret != utils::ErrorCode::kOk) return ret;
+            outputs->push_back(std::move(postprocessed));
+        } else {
+            outputs->push_back(std::move(raw_outputs[i]));
+        }
+    }
+    return utils::ErrorCode::kOk;
 }
 
 std::vector<utils::TensorInfo> ModelHandle::GetInputInfo() const {

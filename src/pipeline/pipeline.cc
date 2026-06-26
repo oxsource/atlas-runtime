@@ -8,6 +8,7 @@
 #include "src/pipeline/nodes/hwc_to_chw_node.h"
 #include "src/pipeline/nodes/normalize_node.h"
 #include "src/pipeline/nodes/resize_node.h"
+#include "src/pipeline/pipeline_node_factory.h"
 #include "src/utils/types.h"
 
 namespace atlas {
@@ -98,6 +99,27 @@ Pipeline Pipeline::BuildInputPipeline(const utils::TensorInfo& target_info) {
     }
 
     return p;
+}
+
+// static
+Pipeline Pipeline::BuildFromManifest(
+    const std::vector<core::ManifestPipelineNode>& nodes) {
+    Pipeline p;
+    auto& factory = PipelineNodeFactory::Instance();
+    for (const auto& node_cfg : nodes) {
+        auto node = factory.Create(node_cfg.name, node_cfg.params);
+        if (node == nullptr) {
+            return Pipeline{};  // Unknown node type
+        }
+        p.AddNode(std::move(node));
+    }
+    return p;
+}
+
+// static
+Pipeline Pipeline::BuildOutputFromManifest(
+    const std::vector<core::ManifestPipelineNode>& nodes) {
+    return BuildFromManifest(nodes);
 }
 
 }  // namespace pipeline

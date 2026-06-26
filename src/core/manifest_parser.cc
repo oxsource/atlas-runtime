@@ -75,6 +75,10 @@ constexpr const char* kKeyNormalize = "normalize";
 constexpr const char* kKeyMean      = "mean";
 constexpr const char* kKeyStd       = "std";
 
+// Pipeline-level keys (optional "pipeline" array on inputs/outputs).
+constexpr const char* kKeyPipeline = "pipeline";
+constexpr const char* kKeyParams   = "params";
+
 // ---------------------------------------------------------------------------
 // Helper functions
 // ---------------------------------------------------------------------------
@@ -134,9 +138,9 @@ bool ExpandEnvVars(std::string* str) {
     return true;
 }
 
-// Parses a single TensorInfo object from |j|.
+// Parses a single ManifestTensorInfo object from |j|.
 utils::ErrorCode ParseTensorInfo(const nlohmann::json& j,
-                                  utils::TensorInfo* info) {
+                                  ManifestTensorInfo* info) {
     if (!j.contains(kKeyName) || !j[kKeyName].is_string()) {
         return utils::ErrorCode::kParseError;
     }
@@ -174,6 +178,35 @@ utils::ErrorCode ParseTensorInfo(const nlohmann::json& j,
             for (const auto& v : norm[kKeyStd]) {
                 info->normalize.std.push_back(v.get<float>());
             }
+        }
+    }
+
+    // Optional: explicit pipeline node chain.  Empty = auto-build.
+    if (j.contains(kKeyPipeline) && j[kKeyPipeline].is_array()) {
+        std::unordered_set<std::string> seen_names;
+        for (const auto& node_json : j[kKeyPipeline]) {
+            ManifestPipelineNode node;
+            if (!node_json.contains(kKeyName) || !node_json[kKeyName].is_string()) {
+                return utils::ErrorCode::kParseError;
+            }
+            node.name = node_json[kKeyName].get<std::string>();
+            if (!seen_names.insert(node.name).second) {
+                return utils::ErrorCode::kParseError;  // Duplicate name
+            }
+            if (node_json.contains(kKeyParams) && node_json[kKeyParams].is_object()) {
+                for (const auto& [k, v] : node_json[kKeyParams].items()) {
+                    if (v.is_string()) {
+                        node.params[k] = v.get<std::string>();
+                    } else if (v.is_number_integer()) {
+                        node.params[k] = std::to_string(v.get<int64_t>());
+                    } else if (v.is_number_float()) {
+                        node.params[k] = std::to_string(v.get<double>());
+                    } else if (v.is_boolean()) {
+                        node.params[k] = v.get<bool>() ? "true" : "false";
+                    }
+                }
+            }
+            info->pipeline.push_back(std::move(node));
         }
     }
 
@@ -225,7 +258,7 @@ utils::ErrorCode ParseModelConfig(const nlohmann::json& j,
         return utils::ErrorCode::kParseError;
     }
     for (const auto& input_json : j[kKeyInputs]) {
-        utils::TensorInfo info;
+        ManifestTensorInfo info;
         auto ret = ParseTensorInfo(input_json, &info);
         if (ret != utils::ErrorCode::kOk) return ret;
         model->inputs.push_back(std::move(info));
@@ -235,7 +268,7 @@ utils::ErrorCode ParseModelConfig(const nlohmann::json& j,
         return utils::ErrorCode::kParseError;
     }
     for (const auto& output_json : j[kKeyOutputs]) {
-        utils::TensorInfo info;
+        ManifestTensorInfo info;
         auto ret = ParseTensorInfo(output_json, &info);
         if (ret != utils::ErrorCode::kOk) return ret;
         model->outputs.push_back(std::move(info));

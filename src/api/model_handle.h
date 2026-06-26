@@ -33,6 +33,11 @@ class ModelHandle {
     utils::ErrorCode Run(const utils::Tensor& raw_input,
                           std::vector<utils::Tensor>* outputs);
 
+    // Multi-input overload: runs each input through its corresponding
+    // pipeline, then passes all preprocessed inputs to IBackend::Infer().
+    utils::ErrorCode Run(const std::vector<utils::Tensor>& raw_inputs,
+                          std::vector<utils::Tensor>* outputs);
+
     // Returns input / output tensor metadata from the backend.
     // Both return empty vectors if IsValid() == false.
     std::vector<utils::TensorInfo> GetInputInfo()  const;

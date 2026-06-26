@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 
+#include "src/core/manifest_config.h"
 #include "src/pipeline/pipeline_node.h"
 #include "src/utils/types.h"
 
@@ -45,6 +46,16 @@ class Pipeline {
     //   HWCToCHW      (only when layout is NCHW)
     //   Normalize     (only when target_info.has_normalize == true)
     static Pipeline BuildInputPipeline(const utils::TensorInfo& target_info);
+
+    // Builds a pipeline from explicit manifest node declarations.
+    // Returns empty pipeline if any node name is unknown.
+    static Pipeline BuildFromManifest(
+        const std::vector<core::ManifestPipelineNode>& nodes);
+
+    // Builds an output post-processing pipeline from manifest declarations.
+    // Returns empty pipeline if nodes is empty or any node is unknown.
+    static Pipeline BuildOutputFromManifest(
+        const std::vector<core::ManifestPipelineNode>& nodes);
 
  private:
     std::vector<std::unique_ptr<IPipelineNode>> nodes_;

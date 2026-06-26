@@ -1,4 +1,4 @@
-#include "src/pipeline/nodes/bgr_to_rgb_node.h"
+#include "src/pipeline/nodes/rgb_to_bgr_node.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -12,13 +12,13 @@ namespace atlas {
 namespace pipeline {
 
 namespace {
-constexpr std::string_view kNodeName      = "BGRToRGB";
+constexpr std::string_view kNodeName      = "RGBToBGR";
 constexpr int              kRequiredChans = 3;
 }  // namespace
 
-std::string_view BGRToRGBNode::Name() const { return kNodeName; }
+std::string_view RGBToBGRNode::Name() const { return kNodeName; }
 
-utils::ErrorCode BGRToRGBNode::Process(const utils::Tensor& input,
+utils::ErrorCode RGBToBGRNode::Process(const utils::Tensor& input,
                                         utils::Tensor* output) {
     if (output == nullptr) return utils::ErrorCode::kInvalidArgument;
     if (input.info.shape.size() != 3) return utils::ErrorCode::kInvalidArgument;
@@ -64,12 +64,12 @@ utils::ErrorCode BGRToRGBNode::Process(const utils::Tensor& input,
 }
 
 // static
-std::unique_ptr<IPipelineNode> BGRToRGBNode::CreateFromParams(
+std::unique_ptr<IPipelineNode> RGBToBGRNode::CreateFromParams(
     const std::unordered_map<std::string, std::string>& params) {
-    return std::make_unique<BGRToRGBNode>();
+    return std::make_unique<RGBToBGRNode>();
 }
 
 }  // namespace pipeline
 }  // namespace atlas
 
-ATLAS_REGISTER_PIPELINE_NODE("bgr_to_rgb", atlas::pipeline::BGRToRGBNode)
+ATLAS_REGISTER_PIPELINE_NODE("rgb_to_bgr", atlas::pipeline::RGBToBGRNode)

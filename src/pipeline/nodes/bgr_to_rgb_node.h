@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <unordered_map>
+
 #include "src/pipeline/pipeline_node.h"
 #include "src/utils/types.h"
 
@@ -16,6 +20,10 @@ class BGRToRGBNode : public IPipelineNode {
                               utils::Tensor* output) override;
     std::string_view Name() const override;
     bool SupportsInPlace() const override { return true; }
+
+    // Creates a node from manifest params. No params required.
+    static std::unique_ptr<IPipelineNode> CreateFromParams(
+        const std::unordered_map<std::string, std::string>& params);
 };
 
 }  // namespace pipeline

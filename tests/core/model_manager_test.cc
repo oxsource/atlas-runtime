@@ -38,13 +38,13 @@ std::string TestModelPath() {
 // identity model.
 ManifestConfig MakeManifest(bool two_models = false,
                               LoadStrategy strategy = LoadStrategy::kEager) {
-    utils::TensorInfo input_info;
+    ManifestTensorInfo input_info;
     input_info.name   = "images";
     input_info.shape  = {1, 3, 4, 4};
     input_info.dtype  = utils::DataType::kFloat32;
     input_info.layout = "NCHW";
 
-    utils::TensorInfo output_info;
+    ManifestTensorInfo output_info;
     output_info.name   = "output";
     output_info.shape  = {1, 3, 4, 4};
     output_info.dtype  = utils::DataType::kFloat32;
