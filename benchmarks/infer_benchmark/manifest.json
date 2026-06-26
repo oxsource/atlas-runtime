@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "name": "benchmark",
+  "models": [
+    {
+      "id": "detector",
+      "backend": "cpu",
+      "model_path": "${BENCH_MODEL_DIR}/bench_224x224.onnx",
+      "load_strategy": "eager",
+      "inputs": [
+        {
+          "name": "images",
+          "shape": [1, 3, 224, 224],
+          "dtype": "float32",
+          "layout": "NCHW",
+          "normalize": {
+            "mean": [0.485, 0.456, 0.406],
+            "std":  [0.229, 0.224, 0.225]
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "shape": [1, 3, 224, 224],
+          "dtype": "float32"
+        }
+      ],
+      "config": { "num_threads": "4" }
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "name": "two-model-pipeline",
+  "models": [
+    {
+      "id": "detector",
+      "name": "Feature Detector",
+      "backend": "cpu",
+      "model_path": "${SAMPLE_MODEL_DIR}/detector.onnx",
+      "load_strategy": "eager",
+      "inputs": [
+        {
+          "name": "images",
+          "shape": [1, 3, 32, 32],
+          "dtype": "float32",
+          "layout": "NCHW",
+          "normalize": {
+            "mean": [0.485, 0.456, 0.406],
+            "std":  [0.229, 0.224, 0.225]
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "features",
+          "shape": [1, 3, 32, 32],
+          "dtype": "float32"
+        }
+      ],
+      "config": { "num_threads": "2" }
+    },
+    {
+      "id": "classifier",
+      "name": "Score Classifier",
+      "backend": "cpu",
+      "model_path": "${SAMPLE_MODEL_DIR}/classifier.onnx",
+      "load_strategy": "lazy",
+      "inputs": [
+        {
+          "name": "images",
+          "shape": [1, 3, 32, 32],
+          "dtype": "float32",
+          "layout": "NCHW"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "scores",
+          "shape": [1, 3, 32, 32],
+          "dtype": "float32"
+        }
+      ],
+      "config": { "num_threads": "2" }
+    }
+  ]
+}
