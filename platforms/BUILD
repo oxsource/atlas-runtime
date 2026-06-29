@@ -37,3 +37,23 @@ config_setting_and_platform(
         "@platforms//cpu:aarch64",
     ],
 )
+
+# Android arm64-v8a
+# Note: rules_android_ndk uses @platforms//cpu:arm64 (same as Apple's alias);
+# this is intentional — rules_android_ndk registers toolchains with arm64.
+config_setting_and_platform(
+    name = "android_arm64",
+    constraint_values = [
+        "@platforms//os:android",
+        "@platforms//cpu:arm64",
+    ],
+)
+
+# Android x86_64 (emulator / x86_64 devices)
+config_setting_and_platform(
+    name = "android_x86_64",
+    constraint_values = [
+        "@platforms//os:android",
+        "@platforms//cpu:x86_64",
+    ],
+)

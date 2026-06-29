@@ -22,4 +22,4 @@ NNN-short-kebab-title.md
 | [001](001-pipeline-manifest-config.md) | Manifest 自由配置 Pipeline | 已采纳 |
 | [002](002-snpe-backend.md) | SNPE 后端接入 | 草案 |
 | [003](003-platform-build-refinement.md) | 精细化平台构建方案 | 已采纳 |
-| [004](004-android-platform-support.md) | Android 平台构建支持 | 草案 |
+| [004](004-android-platform-support.md) | Android 平台构建支持 | 已采纳 |

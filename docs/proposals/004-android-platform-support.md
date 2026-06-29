@@ -2,7 +2,7 @@
 
 > **提议日期**：2026-06-29
 > **提议人**：pizzk <726676435@qq.com>
-> **状态**：草案
+> **状态**：已采纳
 > **类型**：模块级
 > **关联**：`docs/proposals/003-platform-build-refinement.md`（平台体系基础）、`atlas_deps.bzl`、`platforms/BUILD`
 
@@ -78,7 +78,7 @@ onnxruntime-android-1.17.3.aar
 └── AndroidManifest.xml
 ```
 
-> 实际路径在实现前须通过 `unzip -l onnxruntime-android-1.17.3.aar` 验证。
+> 实际路径已通过 `unzip -l onnxruntime-android-1.17.3.aar` 验证（Maven Central 版本）。
 
 ### 3.3 `atlas_deps.bzl` 扩展
 
@@ -88,21 +88,21 @@ onnxruntime-android-1.17.3.aar
 if not native.existing_rule("onnxruntime_android_arm64"):
     http_archive(
         name = "onnxruntime_android_arm64",
-        url = "https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-android-1.17.3.aar",
-        sha256 = "<sha256-to-be-filled>",  # 使用 Bazel 报告的真实 hash 回填
+        url = "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/1.17.3/onnxruntime-android-1.17.3.aar",
+        sha256 = "790d962102a47b9ed3523912cd9a39a67590cd353ae55d88c5358be7b6945d79",
         build_file = "@atlas//third_party:onnxruntime_android_arm64.BUILD",
     )
 
 if not native.existing_rule("onnxruntime_android_x86_64"):
     http_archive(
         name = "onnxruntime_android_x86_64",
-        url = "https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-android-1.17.3.aar",
-        sha256 = "<sha256-to-be-filled>",
+        url = "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/1.17.3/onnxruntime-android-1.17.3.aar",
+        sha256 = "790d962102a47b9ed3523912cd9a39a67590cd353ae55d88c5358be7b6945d79",
         build_file = "@atlas//third_party:onnxruntime_android_x86_64.BUILD",
     )
 ```
 
-> **sha256 获取方法**：先填占位符，执行 `bazel build` 后 Bazel 会输出真实 hash，回填即可。
+> **注**：v1.17.3 GitHub releases 没有 Android 预编译包；AAR 来自 Maven Central `com.microsoft.onnxruntime:onnxruntime-android:1.17.3`，sha256 已验证。
 
 ### 3.4 新增 BUILD 文件
 
@@ -211,7 +211,7 @@ bazel build //src/public:atlas --config=android_arm64
 | `third_party/onnxruntime_android_x86_64.BUILD` | 新增 | x86_64 ABI 专属 BUILD |
 | `src/backend/cpu/BUILD` | 修改 | `select()` 新增 Android 分支（2 处） |
 | `src/public/BUILD` | 修改 | `select()` 新增 Android 分支（1 处） |
-| `WORKSPACE` | 修改 | 调用 `atlas_android_setup()` |
+| `WORKSPACE` | 不变 | `atlas_android_setup()` 供外部项目按需调用，Atlas 自身 WORKSPACE 无需添加 |
 | `.bazelrc` | 修改 | 追加 Android 快捷配置 |
 
 ---
@@ -230,8 +230,8 @@ bazel build //src/public:atlas --config=android_arm64
 
 | 条件 | 说明 |
 |------|------|
-| Android NDK ≥ r25c | 完整 C++17 支持；`ANDROID_NDK_HOME` 需指向 NDK 根目录 |
-| Bazel 6.5 | 内置 `android_ndk_repository`，无需额外依赖 |
+| Android NDK **r21e** | Bazel 6.5 最后正式支持的 NDK 版本（r21.4.7075529）。r22+ 需要 Bazel 7+，否则 `android_ndk_repository` 将 NDK 当成 r21 处理，导致工具链配置不完整，最终回落到宿主工具链（macOS/Linux 本地编译器），产出宿主格式产物而非 Android ELF。 |
+| Bazel 6.5 | 内置 `android_ndk_repository`，支持到 NDK r21 |
 | Proposal-003 已实现 | 本提案基于其平台框架扩展 |
 
 ---
