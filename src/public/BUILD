@@ -43,8 +43,10 @@ cc_library(
         "//src/utils:types",
         "//src/utils:version",
     ] + select({
-        "@bazel_tools//src/conditions:darwin_arm64": ["@onnxruntime_macos_arm64//:onnxruntime"],
-        "//conditions:default": ["@onnxruntime_linux_x86_64//:onnxruntime"],
+        "//platforms:macos_arm64":    ["@onnxruntime_macos_arm64//:onnxruntime"],
+        "//platforms:macos_x86_64":   ["@onnxruntime_macos_arm64//:onnxruntime"],
+        "//platforms:linux_aarch64":  ["@onnxruntime_linux_aarch64//:onnxruntime"],
+        "//conditions:default":       ["@onnxruntime_linux_x86_64//:onnxruntime"],
     }),
     visibility = ["//visibility:public"],
 )

@@ -49,6 +49,15 @@ def atlas_deps():
             build_file = "@atlas//third_party:onnxruntime.BUILD",
         )
 
+    if not native.existing_rule("onnxruntime_linux_aarch64"):
+        http_archive(
+            name = "onnxruntime_linux_aarch64",
+            url = "https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-linux-aarch64-1.17.3.tgz",
+            sha256 = "2a65a5edd9bce2c7f6373117ca3a3a39e2db00d0c03e1c4e2cfe95cd34c42e0e",
+            strip_prefix = "onnxruntime-linux-aarch64-1.17.3",
+            build_file = "@atlas//third_party:onnxruntime.BUILD",
+        )
+
     if not native.existing_rule("googletest"):
         http_archive(
             name = "googletest",
