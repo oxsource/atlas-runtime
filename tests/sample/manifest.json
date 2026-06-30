@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "name": "external-consumer-test",
+  "models": [
+    {
+      "id": "identity_model",
+      "name": "Identity Test Model",
+      "backend": "cpu",
+      "model_path": "identity_1x3x4x4.onnx",
+      "load_strategy": "eager",
+      "inputs": [
+        {
+          "name": "images",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32",
+          "layout": "NCHW"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32"
+        }
+      ],
+      "config": { "num_threads": "1" }
+    }
+  ]
+}

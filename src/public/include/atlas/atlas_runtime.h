@@ -24,7 +24,7 @@ namespace api {
 //       handle.Run(image_tensor, &outputs);
 //   }
 //   rt.Release();
-class AtlasRuntime {
+class ATLAS_API AtlasRuntime {
  public:
     AtlasRuntime();
     ~AtlasRuntime();

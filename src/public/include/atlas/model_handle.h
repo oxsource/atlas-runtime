@@ -18,7 +18,7 @@ namespace api {
 //
 // NOT thread-safe: do not call Run() concurrently on the same handle
 // instance.
-class ModelHandle {
+class ATLAS_API ModelHandle {
  public:
     ModelHandle() = default;
 

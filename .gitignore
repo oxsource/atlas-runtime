@@ -19,3 +19,6 @@ bazel-*
 # Python bytecode (in case any scripts are added later)
 __pycache__/
 *.pyc
+
+# Atlas SDK build output
+atlas-sdk/

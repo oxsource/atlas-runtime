@@ -7,30 +7,14 @@
 
 cc_library(
     name = "atlas",
-    srcs = [
-        "atlas_init.cc",
-    ],
     hdrs = glob(["include/atlas/*.h"]),
-    # Public headers are exposed under the "atlas/" include prefix.
-    # src/public/include is the include root; consumers write
-    #   #include "atlas/atlas_runtime.h"
     strip_include_prefix = "include",
     copts = [
         "-fvisibility=hidden",
         "-fvisibility-inlines-hidden",
         "-DATLAS_SHARED_LIBRARY",
     ],
-    # SONAME / install_name is intentionally NOT set here.
-    # Bazel manages RPATH for sandbox builds; setting a custom install_name
-    # breaks the sandbox's dynamic linker resolution.
-    # The SONAME for distribution is applied by the install script
-    # (tools/install_atlas.sh) when creating the release package.
-    # alwayslink ensures atlas_init.cc (backend anchor) is not stripped
-    # by the linker when building shared libraries.
     alwayslink = 1,
-    # Aggregate all implementation modules. alwayslink on cpu_backend /
-    # cpu_backend_context ensures backend registration static initializers
-    # are retained.
     deps = [
         "//src/api:atlas_runtime",
         "//src/api:model_handle",
@@ -50,5 +34,22 @@ cc_library(
         "//platforms:android_x86_64": ["@onnxruntime_android_x86_64//:onnxruntime"],
         "//conditions:default":       ["@onnxruntime_linux_x86_64//:onnxruntime"],
     }),
+    visibility = ["//visibility:public"],
+)
+
+# Self-contained shared library for external (non-Bazel) consumers.
+# MediaPipe-style: cc_binary(linkshared=True, linkstatic=True) +
+# ATLAS_API-decorated public classes ensure symbols are exported.
+cc_binary(
+    name = "atlas_shared",
+    srcs = ["atlas_init.cc"],
+    linkshared = True,
+    linkstatic = True,
+    copts = [
+        "-fvisibility=hidden",
+        "-fvisibility-inlines-hidden",
+        "-DATLAS_SHARED_LIBRARY",
+    ],
+    deps = [":atlas"],
     visibility = ["//visibility:public"],
 )
