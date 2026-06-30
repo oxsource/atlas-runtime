@@ -20,6 +20,8 @@ cc_library(
         "//src/api:model_handle",
         "//src/backend/cpu:cpu_backend",
         "//src/backend/cpu:cpu_backend_context",
+        "//src/backend/snpe:snpe_backend",
+        "//src/backend/snpe:snpe_backend_context",
         "//src/core:manifest_config",
         "//src/core:manifest_parser",
         "//src/core:model_manager",

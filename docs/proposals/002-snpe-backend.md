@@ -129,7 +129,68 @@ third_party/
 
 ### SNPE SDK 依赖引入方式
 
-SNPE SDK 为闭源商业软件，无法通过 `http_archive` 下载。采用 **条件编译 + stub 降级** 方案：目标平台集成 SDK 并实现完整推理；非目标平台编译 stub 实现，`Load()` 返回 `kBackendNotFound`，不引入 SDK 依赖。
+SNPE SDK 为闭源商业软件，无法通过 `http_archive` 下载，且体积较大不适合整个复制到 Bazel 工作区。采用 **条件编译 + stub 降级 + 环境变量符号链接** 方案：目标平台通过环境变量 `SNPE_SDK_PATH` 零拷贝引用 SDK 并实现完整推理；非目标平台编译 stub 实现，`Load()` 返回 `kBackendNotFound`，不引入 SDK 依赖。
+
+**环境变量驱动的 Zero-Copy 仓库规则：**
+
+通过环境变量 `SNPE_SDK_PATH` 指定 SNPE SDK 安装路径，自定义 Starlark repository rule 读取该变量并创建符号链接，Bazel 通过 `@snpe_sdk` 透明引用，无需复制文件。
+
+```python
+# third_party/snpe/snpe_repo.bzl
+
+def _snpe_sdk_repo_impl(repository_ctx):
+    snpe_path = repository_ctx.os.environ.get("SNPE_SDK_PATH", "")
+    if snpe_path:
+        repository_ctx.symlink(snpe_path, "snpe_sdk_root")
+
+snpe_sdk_repo = repository_rule(
+    implementation = _snpe_sdk_repo_impl,
+    environ = ["SNPE_SDK_PATH"],
+    local = True,
+    doc = "Creates @snpe_sdk from $SNPE_SDK_PATH via symlink (zero-copy).",
+)
+```
+
+**WORKSPACE 中声明（始终生效，无 SDK 时为空仓库）：**
+
+```python
+load("//third_party/snpe:snpe_repo.bzl", "snpe_sdk_repo")
+snpe_sdk_repo(name = "snpe_sdk")
+```
+
+**`@snpe_sdk` 的 BUILD 文件（通过 build_file 参数引用）：**
+
+```python
+# third_party/snpe/snpe.BUILD
+# build_file for @snpe_sdk — paths are relative to the symlinked root
+
+cc_library(
+    name = "snpe",
+    hdrs = glob(["snpe_sdk_root/include/zdl/**/*.hpp"]),
+    includes = ["snpe_sdk_root/include"],
+    srcs = select({
+        "//platforms:linux_aarch64": glob([
+            "snpe_sdk_root/lib/aarch64-linux-gcc/*.so",
+        ]),
+        "//platforms:android_arm64": glob([
+            "snpe_sdk_root/lib/aarch64-android-clang/*.so",
+        ]),
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+)
+```
+
+> `.so` glob 以实际 SNPE SDK 版本目录结构为准，实现时注释标注。
+
+**使用方式（仅目标平台）：**
+
+```bash
+# Linux aarch64 / Android arm64 构建时设置环境变量：
+SNPE_SDK_PATH=/opt/snpe-sdk bazel build --repo_env=SNPE_SDK_PATH //src/backend/snpe/...
+```
+
+macOS 上不设置该变量即可——`repository_rule` 创建空仓库，`select()` 落在 `//conditions:default: []`，不会引用任何 SDK 文件，stub 编译无影响。
 
 **条件编译标记：**
 
@@ -147,6 +208,9 @@ SNPE_PLATFORM = select({
 
 > **平台引用说明**：`//platforms:linux_aarch64` 和 `//platforms:android_arm64` 在 Proposal-003 / Proposal-004 中定义，替代 `@bazel_tools//src/conditions:*` 以统一 `select()` 与 `--platforms` 交叉编译标志。
 
+**src/backend/snpe/BUILD 完整结构：**
+
+```python
 cc_library(
     name = "snpe_backend_context",
     srcs = ["snpe_backend_context.cc"],
@@ -194,7 +258,7 @@ cc_library(
 // snpe_backend.cc
 
 #ifdef ATLAS_SNPE_ENABLED
-// === Full implementation (Linux aarch64 + SNPE SDK) ===
+// === Full implementation (Linux aarch64 / Android arm64 + SNPE SDK) ===
 
 #include "zdl/SNPE/SNPE.hpp"
 // ... SNPE SDK includes ...
@@ -263,29 +327,14 @@ utils::ErrorCode SnpeBackendContext::Init(const std::unordered_map<
 
 **行为矩阵：**
 
-| 平台 | `ATLAS_SNPE_ENABLED` | SNPE SDK | 编译结果 | `Load()` 行为 |
-|------|----------------------|----------|----------|---------------|
-| Linux aarch64（嵌入式 Linux） | 定义 | `@snpe_sdk` 链接（`aarch64-linux-gcc` 目标库） | 完整实现 | 正常加载模型 |
-| Android arm64（Snapdragon 移动设备） | 定义 | `@snpe_sdk` 链接（`aarch64-android-clang` 目标库） | 完整实现 | 正常加载模型 |
-| macOS（任意 CPU） | 未定义 | 不引入 | stub 编译，无 SDK 依赖 | 返回 `kBackendNotFound` |
-| Linux x86_64 | 未定义 | 不引入 | stub 编译，无 SDK 依赖 | 返回 `kBackendNotFound` |
+| 平台 | `SNPE_SDK_PATH` | `ATLAS_SNPE_ENABLED` | SNPE SDK | 编译结果 | `Load()` 行为 |
+|------|-----------------|----------------------|----------|----------|---------------|
+| Linux aarch64（嵌入式 Linux） | 设置 | 定义 | `@snpe_sdk` 符号链接引用 | 完整实现 | 正常加载模型 |
+| Android arm64（Snapdragon 移动设备） | 设置 | 定义 | `@snpe_sdk` 符号链接引用 | 完整实现 | 正常加载模型 |
+| macOS（任意 CPU） | 不设置 | 未定义 | 不引入（空仓库） | stub 编译，无 SDK 依赖 | 返回 `kBackendNotFound` |
+| Linux x86_64 | 不设置 | 未定义 | 不引入（空仓库） | stub 编译，无 SDK 依赖 | 返回 `kBackendNotFound` |
 
-> **关键优势**：非目标平台开发者无需安装 SNPE SDK，`bazel build //...` 即可通过。后端注册始终生效（`ATLAS_REGISTER_BACKEND` 在 stub 分支也执行），`BackendFactory::Create("snpe")` 返回 stub 实例，调用 `Load()` 时才返回错误。
-
-**WORKSPACE 中声明 local_repository（仅目标平台需要）：**
-
-```python
-# In WORKSPACE — uncomment and set path when building for target platforms with SNPE SDK.
-# Linux aarch64（嵌入式 Linux 边缘设备）：指向 SDK 根目录。
-# Android arm64（Snapdragon 移动设备）：需额外配置 Android NDK 工具链（见 Proposal-004），
-#   并确保 local_repository 指向的路径下包含 aarch64-android-clang 目标库。
-# local_repository(
-#     name = "snpe_sdk",
-#     path = "/path/to/snpe-sdk",
-# )
-```
-
-> **Android 目标库路径说明**：SNPE SDK 为 Linux aarch64 嵌入式（`aarch64-linux-gcc`）和 Android（`aarch64-android-clang`）提供不同的预编译 `.so`。`@snpe_sdk` 的 BUILD 文件需通过 `select()` 根据目标平台选择正确的库路径。具体路径映射在实现阶段根据实际 SNPE SDK 版本确定。
+> **关键优势**：非目标平台开发者无需安装 SNPE SDK，`bazel build //...` 即可通过。后端注册始终生效（`ATLAS_REGISTER_BACKEND` 在 stub 分支也执行），`BackendFactory::Create("snpe")` 返回 stub 实例，调用 `Load()` 时才返回错误。目标平台通过环境变量零拷贝引用 SDK，无需复制大型文件。
 
 ### 公共库集成
 

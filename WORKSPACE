@@ -19,3 +19,9 @@ bind(
 )
 
 atlas_android_setup()
+
+# SNPE SDK — zero-copy reference via $SNPE_SDK_PATH.
+# When the environment variable is not set, @snpe_sdk is empty and
+# the SNPE backend compiles as a stub (no SDK dependency).
+load("//third_party/snpe:snpe_repo.bzl", "snpe_sdk_repo")
+snpe_sdk_repo(name = "snpe_sdk")
