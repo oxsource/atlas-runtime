@@ -31,7 +31,7 @@ Before making any changes, read the compiled AI Memory files in `.ai/`. These co
 4. **No exceptions.** All public APIs return `atlas::utils::ErrorCode`. No `throw`/`catch`.
 5. **No magic values.** Use `constexpr` named constants for all meaningful literals.
 6. **All comments in English.** Including Doxygen, inline, and block comments.
-7. **Commits must include `AI-Tool` trailer.** Format: `AI-Tool: <tool> / <model>`.
+7. **Commits must include `AI-Tool` trailer.** Format: `AI-Tool: <tool> / <model>`. Commit messages must use only ASCII characters — no Chinese, emoji, or non-ASCII symbols.
 8. **Pipeline node config field is `name`**, not ~~`type`~~.
 
 ## Build & Test

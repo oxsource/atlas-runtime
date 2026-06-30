@@ -205,6 +205,7 @@ bazel test //...
 - 格式：`feat: phase N — <简短描述>`
 - commit body 使用 `-` 逐条列出本阶段新增/修改的主要内容；
 - commit body 末尾附加 `Co-Authored-By` 或 `AI-Tool` trailer，标注当前开发所使用的 AI 工具类型及模型；
+- 提交信息仅允许使用 ASCII 字符（禁止中文、emoji、非 ASCII 符号）
 - 每个阶段一笔完整提交，保持 git log 清晰。
 
 **AI 工具标注格式：**

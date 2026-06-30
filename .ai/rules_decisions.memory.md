@@ -30,6 +30,7 @@
 - Doc review: `docs: periodic doc review — <date>`
 - Body: `-` bullet list of changes
 - Trailer: `AI-Tool: <tool> / <model>` (required for all commits since spec生效)
+- Commit messages must use only ASCII characters (no Chinese, emoji, non-ASCII symbols).
 - Early commits (phase 1-5) without trailer: no backfill needed.
 
 ### Document Rules
