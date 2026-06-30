@@ -461,3 +461,4 @@ tests/
 
 | BUG | 日期 | 简述 | 等级 | 状态 |
 |-----|------|------|------|------|
+| [BUG-001](bugfixes/BUG-001-missing-onnxruntime-linux-soname.md) | 2026-06-30 | Linux 平台 ONNX Runtime SONAME 缺失导致 5 个测试失败 | P0 | 已修复 |

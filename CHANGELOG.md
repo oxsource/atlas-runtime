@@ -64,6 +64,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `manifest_parser_test`, `cpu_backend_test`, `pipeline_test`,
   `model_manager_test`, `atlas_runtime_test`.
 
+### Fixed
+- BUG-001: Linux platform ONNX Runtime SONAME missing causes 5 test failures (P0)
+
 ---
 
 ## Baseline Performance (macOS arm64, 4 threads, Identity model)
