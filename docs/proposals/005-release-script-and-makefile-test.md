@@ -21,7 +21,7 @@
 ### 1.3 目标
 
 - 提供 `tools/build_release.sh` 脚本，支持 `--platform` 参数指定目标平台，通过 Bazel `--config` 交叉编译，将产物（头文件、共享库、运行时依赖、pkg-config）输出到可移植的 SDK 目录（默认 `atlas-sdk/<platform>/`）。
-- 新增 `tests/external_consumer/` 测试模块，使用 Makefile 集成 SDK 头文件和共享库，实现端到端的接口调用测试，验证非 Bazel 场景下的可用性。
+- 新增 `examples/shared_library/` 示例项目，使用 Makefile 集成 SDK 头文件和共享库，实现端到端的接口调用测试，验证非 Bazel 场景下的可用性。
 
 ## 二、方案概要
 
@@ -66,7 +66,7 @@ atlas-sdk/
     └── ...
         │
         ▼
-tests/external_consumer/            ← Makefile 集成测试
+examples/shared_library/            ← Makefile 集成示例
 ├── Makefile                        ← 通过 ATLAS_SDK 或 pkg-config 引用
 ├── main.cc                         ← 调用 AtlasRuntime / ModelHandle API
 ├── manifest.json                   ← 清单文件
@@ -117,7 +117,7 @@ atlas-sdk/
 | 项目 | 说明 |
 |------|------|
 | 新增 `tools/build_release.sh` | 脚本编译输出 SDK，支持 `--platform` 跨平台构建 |
-| 新增 `tests/external_consumer/` | Makefile 集成测试模块（含 `Makefile`、`main.cc`、`manifest.json`、`README.md`） |
+| 新增 `examples/shared_library/` | Makefile 集成示例项目（含 `Makefile`、`main.cc`、`manifest.json`、`README.md`） |
 | 引用现有 `tests/backend/cpu/test_data/identity_1x3x4x4.onnx` | 仅引用，不新增 |
 | 相关文档 `docs/phase6.md` | 采纳后补充到阶段六文档 |
 
