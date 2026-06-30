@@ -24,3 +24,4 @@ NNN-short-kebab-title.md
 | [003](003-platform-build-refinement.md) | 精细化平台构建方案 | 已采纳 |
 | [004](004-android-platform-support.md) | Android 平台构建支持 | 已采纳 |
 | [005](005-release-script-and-makefile-test.md) | 脚本编译输出与 Makefile 集成测试 | 已采纳 |
+| [006](006-model-config-public-api.md) | ModelHandle 暴露 ModelConfig 关键字段 | 草案 |

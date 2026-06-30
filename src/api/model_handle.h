@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "src/utils/types.h"
@@ -42,6 +44,11 @@ class ModelHandle {
     // Both return empty vectors if IsValid() == false.
     std::vector<utils::TensorInfo> GetInputInfo()  const;
     std::vector<utils::TensorInfo> GetOutputInfo() const;
+
+    std::string GetBackend() const;
+    std::string GetModelPath() const;
+    int GetLoadStrategy() const;
+    std::unordered_map<std::string, std::string> GetConfig() const;
 
  private:
     friend class AtlasRuntime;

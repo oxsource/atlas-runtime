@@ -453,7 +453,7 @@ tests/
 
 | Proposal | 日期 | 简述 | 状态 |
 |----------|------|------|------|
-
+| [Proposal-006](proposals/006-model-config-public-api.md) | 2026-06-30 | ModelHandle 暴露 ModelConfig 关键字段 | 已采纳 |
 ---
 
 ## Bugfix 记录

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "atlas/atlas_export.h"
@@ -38,6 +40,22 @@ class ATLAS_API ModelHandle {
     // Both return empty vectors if IsValid() == false.
     std::vector<utils::TensorInfo> GetInputInfo()  const;
     std::vector<utils::TensorInfo> GetOutputInfo() const;
+
+    // Returns the backend name, e.g. "cpu".  Returns empty string if
+    // IsValid() == false.
+    std::string GetBackend() const;
+
+    // Returns the model file path with environment variables expanded.
+    // Returns empty string if IsValid() == false.
+    std::string GetModelPath() const;
+
+    // Returns the load strategy: 0 = eager load at Init() time,
+    // 1 = lazy load on first Run() call.  Returns 0 if IsValid() == false.
+    int GetLoadStrategy() const;
+
+    // Returns the backend-specific key-value config table.
+    // Returns empty map if IsValid() == false.
+    std::unordered_map<std::string, std::string> GetConfig() const;
 
  private:
     friend class AtlasRuntime;

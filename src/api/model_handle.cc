@@ -117,5 +117,25 @@ std::vector<utils::TensorInfo> ModelHandle::GetOutputInfo() const {
     return entry_->backend->GetOutputInfo();
 }
 
+std::string ModelHandle::GetBackend() const {
+    if (!IsValid()) return {};
+    return entry_->config.backend;
+}
+
+std::string ModelHandle::GetModelPath() const {
+    if (!IsValid()) return {};
+    return entry_->config.model_path;
+}
+
+int ModelHandle::GetLoadStrategy() const {
+    if (!IsValid()) return 0;
+    return static_cast<int>(entry_->config.load_strategy);
+}
+
+std::unordered_map<std::string, std::string> ModelHandle::GetConfig() const {
+    if (!IsValid()) return {};
+    return entry_->config.config;
+}
+
 }  // namespace api
 }  // namespace atlas
