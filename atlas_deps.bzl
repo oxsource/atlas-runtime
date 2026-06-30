@@ -43,9 +43,9 @@ def atlas_deps():
     if not native.existing_rule("onnxruntime_linux_x86_64"):
         http_archive(
             name = "onnxruntime_linux_x86_64",
-            url = "https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-linux-x86_64-1.17.3.tgz",
-            sha256 = "0019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5",
-            strip_prefix = "onnxruntime-linux-x86_64-1.17.3",
+            url = "https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-linux-x64-1.17.3.tgz",
+            sha256 = "f2f11f9da1e3e19b22a8b378b9af57a58433f40e3db6a803e75c0ec0eba97a20",
+            strip_prefix = "onnxruntime-linux-x64-1.17.3",
             build_file = "@atlas//third_party:onnxruntime.BUILD",
         )
 
@@ -53,7 +53,7 @@ def atlas_deps():
         http_archive(
             name = "onnxruntime_linux_aarch64",
             url = "https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-linux-aarch64-1.17.3.tgz",
-            sha256 = "2a65a5edd9bce2c7f6373117ca3a3a39e2db00d0c03e1c4e2cfe95cd34c42e0e",
+            sha256 = "9f801577bd99676d1d821022e52b1f4554f56339ae3606c7b5ff3155f443c921",
             strip_prefix = "onnxruntime-linux-aarch64-1.17.3",
             build_file = "@atlas//third_party:onnxruntime.BUILD",
         )
