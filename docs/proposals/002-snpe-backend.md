@@ -123,7 +123,8 @@ src/backend/snpe/
 └── BUILD
 
 third_party/
-└── snpe.BUILD              # BUILD file for SNPE SDK prebuilt library
+└── snpe/
+    └── snpe.BUILD          # BUILD file for SNPE SDK prebuilt library
 ```
 
 ### SNPE SDK 依赖引入方式
@@ -413,7 +414,7 @@ ErrorCode SnpeBackend::Load(const std::string& model_path,
 }
 </bds-codeblock>
 
-### 5.3 `third_party/snpe.BUILD` 内容
+### 5.3 `third_party/snpe/snpe.BUILD` 内容
 
 SNPE SDK 典型目录结构（以 Linux aarch64 目标为例）：
 
@@ -433,7 +434,7 @@ snpe-sdk/
     └── libsnpe_dsp_skel.so   # DSP 运行时需要同步部署到设备
 ```
 
-**`third_party/snpe.BUILD` 关键结构**：
+**`third_party/snpe/snpe.BUILD` 关键结构**：
 
 ```python
 cc_library(
