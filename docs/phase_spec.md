@@ -202,7 +202,7 @@ bazel test //...
 ### Step 6 — git commit
 
 **提交规范：**
-- 格式：`feat: phase N — <简短描述>`
+- 格式：`feat: phase N -- <简短描述>`
 - commit body 使用 `-` 逐条列出本阶段新增/修改的主要内容；
 - commit body 末尾附加 `Co-Authored-By` 或 `AI-Tool` trailer，标注当前开发所使用的 AI 工具类型及模型；
 - 提交信息仅允许使用 ASCII 字符（禁止中文、emoji、非 ASCII 符号）
@@ -219,7 +219,7 @@ AI-Tool: <工具名称> / <模型名称>
 示例：
 
 ```
-feat: phase 6 — public shared library and Bazel integration
+feat: phase 6 -- public shared library and Bazel integration
 
 - Add src/public/ bridge layer with atlas_export.h symbol visibility control
 - Add include/atlas/ public header set (atlas_runtime.h, model_handle.h, types.h, version.h)

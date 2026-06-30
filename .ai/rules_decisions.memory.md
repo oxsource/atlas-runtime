@@ -22,12 +22,12 @@
 - Severity: P0 (fatal, immediate) / P1 (severe, current iteration) / P2 (general, next) / P3 (minor).
 - P0/P1 must have regression tests.
 - Bug numbering: incremental, independent from proposals.
-- Commit format: `fix: BUG-NNN — <description>`
+- Commit format: `fix: BUG-NNN -- <description>`
 
 ### Commit Convention
-- Feature: `feat: phase N — <description>` or `feat: Proposal-NNN — <description>`
-- Bugfix: `fix: BUG-NNN — <description>`
-- Doc review: `docs: periodic doc review — <date>`
+- Feature: `feat: phase N -- <description>` or `feat: Proposal-NNN -- <description>`
+- Bugfix: `fix: BUG-NNN -- <description>`
+- Doc review: `docs: periodic doc review -- <date>`
 - Body: `-` bullet list of changes
 - Trailer: `AI-Tool: <tool> / <model>` (required for all commits since spec生效)
 - Commit messages must use only ASCII characters (no Chinese, emoji, non-ASCII symbols).
@@ -46,7 +46,7 @@
 - 3+ adopted proposals
 - Architecture change
 - 30 days since last review
-- Commit format: `docs: periodic doc review — <date>`
+- Commit format: `docs: periodic doc review -- <date>`
 
 ### Terminology
 - Pipeline node config field: `name` (NOT ~~`type`~~)
