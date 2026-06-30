@@ -69,18 +69,21 @@ echo "[2/2] Packaging SDK ..."
 # Determine shared library extension and naming conventions.
 # macOS uses .dylib with version before extension (libfoo.1.dylib).
 # Linux / Android use .so with version after extension (libfoo.so.1).
+ATLAS_VERSION="1.0.0"
+ATLAS_SO_VERSION="${ATLAS_VERSION%%.*}"
+
 if [[ "${PLATFORM}" == macos_* ]] || { [[ -z "${PLATFORM}" ]] && [[ "$(uname -s)" == "Darwin" ]]; }; then
     LIB_EXT=".dylib"
-    LIBA_NAME="libatlas.1.0.0.dylib"
-    LIBA_SO1="libatlas.1.dylib"
+    LIBA_NAME="libatlas.${ATLAS_VERSION}.dylib"
+    LIBA_SO1="libatlas.${ATLAS_SO_VERSION}.dylib"
     LIBA_SO="libatlas.dylib"
-    SONAME="libatlas.1.dylib"
+    SONAME="libatlas.${ATLAS_SO_VERSION}.dylib"
 else
     LIB_EXT=".so"
-    LIBA_NAME="libatlas.so.1.0.0"
-    LIBA_SO1="libatlas.so.1"
+    LIBA_NAME="libatlas.so.${ATLAS_VERSION}"
+    LIBA_SO1="libatlas.so.${ATLAS_SO_VERSION}"
     LIBA_SO="libatlas.so"
-    SONAME="libatlas.so.1"
+    SONAME="libatlas.so.${ATLAS_SO_VERSION}"
 fi
 
 rm -rf "${OUTPUT_DIR}"
