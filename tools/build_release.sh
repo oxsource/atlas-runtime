@@ -65,6 +65,24 @@ echo "[1/2] Building //src/public:atlas_shared ..."
 bazel build //src/public:atlas_shared ${BAZEL_CONFIG}
 
 echo "[2/2] Packaging SDK ..."
+
+# Determine shared library extension and naming conventions.
+# macOS uses .dylib with version before extension (libfoo.1.dylib).
+# Linux / Android use .so with version after extension (libfoo.so.1).
+if [[ "${PLATFORM}" == macos_* ]] || { [[ -z "${PLATFORM}" ]] && [[ "$(uname -s)" == "Darwin" ]]; }; then
+    LIB_EXT=".dylib"
+    LIBA_NAME="libatlas.1.0.0.dylib"
+    LIBA_SO1="libatlas.1.dylib"
+    LIBA_SO="libatlas.dylib"
+    SONAME="libatlas.1.dylib"
+else
+    LIB_EXT=".so"
+    LIBA_NAME="libatlas.so.1.0.0"
+    LIBA_SO1="libatlas.so.1"
+    LIBA_SO="libatlas.so"
+    SONAME="libatlas.so.1"
+fi
+
 rm -rf "${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_DIR}/include/atlas" "${OUTPUT_DIR}/lib/pkgconfig"
 
@@ -72,15 +90,18 @@ mkdir -p "${OUTPUT_DIR}/include/atlas" "${OUTPUT_DIR}/lib/pkgconfig"
 cp "${REPO_ROOT}/src/public/include/atlas/"*.h "${OUTPUT_DIR}/include/atlas/"
 
 # Self-contained shared library (MediaPipe-style)
-cp "${REPO_ROOT}/bazel-bin/src/public/libatlas_shared.dylib" \
-   "${OUTPUT_DIR}/lib/libatlas.1.0.0.dylib"
-ln -sf libatlas.1.0.0.dylib "${OUTPUT_DIR}/lib/libatlas.1.dylib"
-ln -sf libatlas.1.dylib     "${OUTPUT_DIR}/lib/libatlas.dylib"
-install_name_tool -id @rpath/libatlas.1.dylib "${OUTPUT_DIR}/lib/libatlas.1.0.0.dylib" 2>/dev/null || true
+cp "${REPO_ROOT}/bazel-bin/src/public/libatlas_shared${LIB_EXT}" \
+   "${OUTPUT_DIR}/lib/${LIBA_NAME}"
+ln -sf "${LIBA_NAME}" "${OUTPUT_DIR}/lib/${LIBA_SO1}"
+ln -sf "${LIBA_SO1}" "${OUTPUT_DIR}/lib/${LIBA_SO}"
+
+if [[ "${PLATFORM}" == macos_* ]] || { [[ -z "${PLATFORM}" ]] && [[ "$(uname -s)" == "Darwin" ]]; }; then
+    install_name_tool -id "@rpath/${SONAME}" "${OUTPUT_DIR}/lib/${LIBA_NAME}" 2>/dev/null || true
+fi
 
 # ONNX Runtime
 ORT_LIB=$(find "$(bazel info output_base 2>/dev/null || echo /private/var/tmp/_bazel_moks)" \
-    -name "libonnxruntime.1.17.3.dylib" -type f 2>/dev/null | head -1)
+    -name "libonnxruntime*${LIB_EXT}" -type f 2>/dev/null | head -1)
 if [[ -n "${ORT_LIB}" ]]; then
     cp "${ORT_LIB}" "${OUTPUT_DIR}/lib/"
 fi
@@ -92,7 +113,7 @@ sed "s|@PREFIX@|${OUTPUT_DIR}|g" "${REPO_ROOT}/tools/atlas.pc.in" \
 echo ""
 echo "═══ SDK ready: ${OUTPUT_DIR} ═══"
 echo "  include/atlas/  $(ls "${OUTPUT_DIR}/include/atlas/" | wc -l) headers"
-echo "  lib/            $(ls "${OUTPUT_DIR}/lib/"*.dylib 2>/dev/null | wc -l | tr -d ' ') dylibs"
+echo "  lib/            $(ls "${OUTPUT_DIR}/lib/"*${LIB_EXT} 2>/dev/null | wc -l | tr -d ' ') libs"
 echo ""
 echo "To test:"
 echo "  export ATLAS_SDK=${OUTPUT_DIR}"
