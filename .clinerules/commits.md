@@ -21,6 +21,7 @@ AI-Tool: Cline / <model>
 
 ## Rules
 - `AI-Tool` trailer required on all AI-assisted commits
+- **Model name**: Cline must read `.clinerules/ai_model` to get the correct `<model>` value for the trailer. Do not guess or hardcode the model name.
 - Do NOT use `--no-verify` or `--force` on shared branches
 - One commit per concern: no mixing feat + fix
 
