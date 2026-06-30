@@ -14,6 +14,7 @@ cc_library(
         ],
         "//conditions:default": [
             "lib/libonnxruntime.so",
+            "lib/libonnxruntime.so.1.17.3",
         ],
     }),
     visibility = ["//visibility:public"],
