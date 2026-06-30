@@ -132,15 +132,19 @@ SNPE SDK 为闭源商业软件，无法通过 `http_archive` 下载。采用 **�
 
 **条件编译标记：**
 
-通过 Bazel `defines` 控制编译路径：
+通过 Bazel `defines` 控制编译路径。SNPE 完整实现在 Linux aarch64（嵌入式 Linux 边缘设备）和 Android arm64（Snapdragon 移动设备）两个目标平台启用：
 
 ```python
 # src/backend/snpe/BUILD
 
 SNPE_PLATFORM = select({
-    "@bazel_tools//src/conditions:linux_aarch64": ["ATLAS_SNPE_ENABLED=1"],
+    "//platforms:linux_aarch64": ["ATLAS_SNPE_ENABLED=1"],
+    "//platforms:android_arm64": ["ATLAS_SNPE_ENABLED=1"],
     "//conditions:default": [],
 })
+```
+
+> **平台引用说明**：`//platforms:linux_aarch64` 和 `//platforms:android_arm64` 在 Proposal-003 / Proposal-004 中定义，替代 `@bazel_tools//src/conditions:*` 以统一 `select()` 与 `--platforms` 交叉编译标志。
 
 cc_library(
     name = "snpe_backend_context",
@@ -152,7 +156,8 @@ cc_library(
         "//src/backend/base:i_backend_context",
         "//src/utils:types",
     ] + select({
-        "@bazel_tools//src/conditions:linux_aarch64": ["@snpe_sdk//:snpe"],
+        "//platforms:linux_aarch64": ["@snpe_sdk//:snpe"],
+        "//platforms:android_arm64": ["@snpe_sdk//:snpe"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -171,7 +176,8 @@ cc_library(
         "//src/core:manifest_config",
         "//src/utils:types",
     ] + select({
-        "@bazel_tools//src/conditions:linux_aarch64": ["@snpe_sdk//:snpe"],
+        "//platforms:linux_aarch64": ["@snpe_sdk//:snpe"],
+        "//platforms:android_arm64": ["@snpe_sdk//:snpe"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -258,8 +264,9 @@ utils::ErrorCode SnpeBackendContext::Init(const std::unordered_map<
 
 | 平台 | `ATLAS_SNPE_ENABLED` | SNPE SDK | 编译结果 | `Load()` 行为 |
 |------|----------------------|----------|----------|---------------|
-| Linux aarch64 | 定义 | `@snpe_sdk` 链接 | 完整实现 | 正常加载模型 |
-| macOS | 未定义 | 不引入 | stub 编译，无 SDK 依赖 | 返回 `kBackendNotFound` |
+| Linux aarch64（嵌入式 Linux） | 定义 | `@snpe_sdk` 链接（`aarch64-linux-gcc` 目标库） | 完整实现 | 正常加载模型 |
+| Android arm64（Snapdragon 移动设备） | 定义 | `@snpe_sdk` 链接（`aarch64-android-clang` 目标库） | 完整实现 | 正常加载模型 |
+| macOS（任意 CPU） | 未定义 | 不引入 | stub 编译，无 SDK 依赖 | 返回 `kBackendNotFound` |
 | Linux x86_64 | 未定义 | 不引入 | stub 编译，无 SDK 依赖 | 返回 `kBackendNotFound` |
 
 > **关键优势**：非目标平台开发者无需安装 SNPE SDK，`bazel build //...` 即可通过。后端注册始终生效（`ATLAS_REGISTER_BACKEND` 在 stub 分支也执行），`BackendFactory::Create("snpe")` 返回 stub 实例，调用 `Load()` 时才返回错误。
@@ -267,32 +274,50 @@ utils::ErrorCode SnpeBackendContext::Init(const std::unordered_map<
 **WORKSPACE 中声明 local_repository（仅目标平台需要）：**
 
 ```python
-# In WORKSPACE — uncomment and set path when building for Linux aarch64 with SNPE SDK
+# In WORKSPACE — uncomment and set path when building for target platforms with SNPE SDK.
+# Linux aarch64（嵌入式 Linux 边缘设备）：指向 SDK 根目录。
+# Android arm64（Snapdragon 移动设备）：需额外配置 Android NDK 工具链（见 Proposal-004），
+#   并确保 local_repository 指向的路径下包含 aarch64-android-clang 目标库。
 # local_repository(
 #     name = "snpe_sdk",
 #     path = "/path/to/snpe-sdk",
 # )
 ```
 
+> **Android 目标库路径说明**：SNPE SDK 为 Linux aarch64 嵌入式（`aarch64-linux-gcc`）和 Android（`aarch64-android-clang`）提供不同的预编译 `.so`。`@snpe_sdk` 的 BUILD 文件需通过 `select()` 根据目标平台选择正确的库路径。具体路径映射在实现阶段根据实际 SNPE SDK 版本确定。
+
 ### 公共库集成
 
-`//src/public:atlas` 的 deps 添加 SNPE 后端：
+`//src/public:atlas` 的 deps 添加 SNPE 后端（无需额外 `select()`，因为 SNPE 后端自身已通过 `SNPE_PLATFORM` 在非目标平台编译为 stub，始终可被依赖）：
 
 ```python
 deps = [
     # ... existing deps ...
     "//src/backend/snpe:snpe_backend",
     "//src/backend/snpe:snpe_backend_context",
-] + select({
-    "@bazel_tools//src/conditions:linux_aarch64": [],
-    "//conditions:default": [],
-    # SNPE backend compiles to no-op on non-target platforms
-}),
+],
 ```
 
 ### 模型格式
 
 SNPE 使用 `.dlc`（Deep Learning Container）格式模型。可通过 SNPE SDK 的 `snpe-onnx-to-dlc` 工具从 ONNX 转换。`ManifestParser` 的 `model_path` 字段直接指向 `.dlc` 文件路径，无需修改解析器。
+
+### 交叉编译宿主要求
+
+**编译（Compile）不强制要求 Linux 宿主**。C++ 头文件和目标 `.so` 均为平台无关内容——LLVM/Clang 交叉编译器配合 `--target=aarch64-linux-gnu` 或 `--target=aarch64-linux-android` 即可在 macOS / Windows 上产出目标平台二进制文件。Bazel 的 `--platforms` 交叉编译机制（Proposal-003 已建立）正是为这一场景设计的。
+
+**但模型转换（Model Conversion）必须依赖 Linux x86_64 宿主**。SNPE SDK 官方仅提供 Linux x86_64 宿主版本，其内含的模型转换工具（`snpe-onnx-to-dlc`）和 Python 工具链均为 Linux ELF 二进制文件。这些工具负责将 ONNX 模型转换为 `.dlc` 格式并完成量化——若宿主非 Linux x86_64，工具链无法运行。
+
+> **推荐实践**：在 Linux x86_64 宿主（或 Docker 容器 `ubuntu:22.04`）上完成 SNPE 集成的全流程开发。纯 C++ 编译步骤理论上不限于 Linux，但模型转换步骤必须依赖 Linux 环境，统一使用 Linux 宿主可避免环境割裂。
+
+### SNPE SDK 版本与平台约束
+
+| 维度 | 说明 |
+|------|------|
+| 宿主环境 | SDK 官方仅发布 Linux x86_64 版本 |
+| 目标平台 | Linux aarch64（嵌入式）、Android aarch64（移动设备） |
+| API 兼容性 | SDK 版本需与目标设备的 SNPE 运行时版本匹配（Qualcomm 无前向兼容保证） |
+| 模型转换 | `snpe-onnx-to-dlc` 的运行需要 Linux x86_64 + Python 3.8/3.10 |
 
 ## 三、影响范围
 
@@ -302,7 +327,7 @@ SNPE 使用 `.dlc`（Deep Learning Container）格式模型。可通过 SNPE SDK
 | 公共 API | 无变更（`ModelHandle::Run` 接口不变） |
 | 内部模块 | 新增 `src/backend/snpe/`，不修改现有模块 |
 | 新增依赖 | SNPE SDK（闭源，local_repository 引入） |
-| 平台支持 | Linux aarch64 / Android（macOS / Linux x86_64 上编译为 no-op） |
+| 平台支持 | Linux aarch64（嵌入式 Linux）+ Android arm64（Snapdragon 移动设备）；macOS / Linux x86_64 编译为 stub no-op |
 | 公共库 | `//src/public:atlas` deps 增加条件依赖 |
 | 预估工作量 | 中等（接口实现 + SDK 集成 + 条件编译 + 测试） |
 
@@ -313,3 +338,135 @@ SNPE 使用 `.dlc`（Deep Learning Container）格式模型。可通过 SNPE SDK
   - `→ phase2.md`（Feature 记录章节添加 Proposal-002 关联记录，因后端实现模式在阶段二建立）
 - [ ] 若采纳：确认 SNPE SDK 版本与安装路径，按 `phase_spec.md` 流程推进实现
 - [ ] 若驳回：填写驳回理由
+
+---
+
+> **【补充】** 2026-06-30 | 评审反馈，需在实现阶段澄清以下设计细节：
+
+## 五、评审待澄清事项
+
+### 5.1 `SnpeBackendContext::Init()` 调用链
+
+当前 `IBackendContext` 基类（`src/backend/base/i_backend_context.h`）仅声明 `BackendType()`，无 `Init()` 虚函数。`CpuBackendContext` 在构造函数中完成初始化，不依赖外部 `Init()` 调用。
+
+**设计决策（待确认）**：`SnpeBackendContext::Init()` 由 `SnpeBackend::Load()` 内部通过 `static_cast<SnpeBackendContext*>(ctx)` 调用。
+
+**理由**：
+- 符合现有模式——`CpuBackend::Load()` 同样通过 ctx 持有 `Ort::Env`，后端自行管理上下文生命周期
+- 不修改 `IBackendContext` 基类，不产生接口变更
+- `ModelManager::Init()` 中 `factory.CreateContext()` 仅创建实例，后续由首个 `Load()` 调用触发 `Init()`
+
+**幂等性要求**：`Init()` 必须支持重复调用——同一 manifest 中多个 SNPE 模型依次 Load 时，`Init()` 在首个模型 Load 时完成 SDK 内部运行时初始化，后续调用应检测已初始化并跳过。
+
+### 5.2 资源拆分：Context（共享）vs Backend（per-model）
+
+**场景**：同一 manifest 中有两个 SNPE 模型，`config.runtime` 可能不同（如一个 `"dsp"` 一个 `"gpu"`）。
+
+**现有架构约束**：`ModelManager::Init()` 中 `seen_types` set 保证每个后端类型只有一个 `IBackendContext` 实例。
+
+**对照 `CpuBackendContext` 的资源拆分模式：**
+
+| 资源 | `CpuBackendContext`（共享） | `CpuBackend`（per-model） |
+|------|---------------------------|--------------------------|
+| ONNX Runtime 环境 | `Ort::Env` | — |
+| 推理会话 | — | `Ort::Session` |
+| 内存分配器 | `Ort::Allocator`（可选） | — |
+| Session options | — | per-model 线程数等 |
+
+**SNPE 同样遵循此模式——可复用资源放入 Context：**
+
+| 资源 | `SnpeBackendContext`（共享） | `SnpeBackend`（per-model） |
+|------|-----------------------------|--------------------------|
+| SNPE 日志/框架初始化 | `SNPEFactory::InitializeLogging()` | — |
+| 平台运行时容器 | `zdl::DlSystem::Runtime_t` 容器 | — |
+| user buffer 池（buffer 模式） | 跨模型复用的 tensor buffer 列表 | — |
+| SNPE 网络实例 | — | `zdl::SNPE::SNPE` |
+| runtime target（cpu/gpu/dsp/aip） | — | 从 `ModelConfig::config` 提取 |
+| performance_profile | — | 从 `ModelConfig::config` 提取 |
+| use_buffer | — | 从 `ModelConfig::config` 提取 |
+
+**`config.runtime` 冲突问题**：`runtime` 不在 Context 层面消费——`SnpeBackendContext::Init()` 的 config 参数仅提取全局性字段（如日志级别）；per-model 字段（runtime / profile / use_buffer）绕开 Context，由 `SnpeBackend::Load()` 从 `ModelConfig::config` 直接提取，与 `Ort::SessionOptions` 的处理方式一致。
+
+<bds-codeblock language="cpp">
+// SnpeBackend::Load() pseudocode
+ErrorCode SnpeBackend::Load(const std::string& model_path,
+                              const ModelConfig& config,
+                              IBackendContext* ctx) {
+    // 1. 确保共享上下文初始化（全局一次性操作，幂等）
+    if (ctx) {
+        auto* snpe_ctx = static_cast<SnpeBackendContext*>(ctx);
+        snpe_ctx->Init(config.config);  // 仅消费全局字段，per-model 字段被忽略
+    }
+
+    // 2. 从 ModelConfig::config 提取 per-model 参数，创建网络实例
+    auto runtime = config.config.count("runtime")
+                       ? ParseRuntime(config.config.at("runtime"))
+                       : Runtime_t::GPU;  // 默认 GPU
+    auto profile = config.config.count("performance_profile")
+                       ? ParseProfile(config.config.at("performance_profile"))
+                       : PerformanceProfile_t::BALANCED;
+
+    snpe_ = SNPEBuilder(runtime, model_path)
+                .setPerformanceProfile(profile)
+                .build();  // per-model 拥有独立的 SNPE 网络实例
+    // ...
+}
+</bds-codeblock>
+
+### 5.3 `third_party/snpe.BUILD` 内容
+
+SNPE SDK 典型目录结构（以 Linux aarch64 目标为例）：
+
+```
+snpe-sdk/
+├── include/zdl/
+│   ├── SNPE/SNPE.hpp
+│   ├── SNPE/SNPEFactory.hpp
+│   ├── DlSystem/DlSystem.hpp
+│   └── ...
+├── lib/
+│   ├── aarch64-linux-gcc/
+│   │   └── libSNPE.so
+│   └── aarch64-android-clang/
+│       └── libSNPE.so
+└── lib/dsp/
+    └── libsnpe_dsp_skel.so   # DSP 运行时需要同步部署到设备
+```
+
+**`third_party/snpe.BUILD` 关键结构**：
+
+```python
+cc_library(
+    name = "snpe",
+    hdrs = glob(["include/zdl/**/*.hpp"]),
+    includes = ["include"],
+    srcs = select({
+        "//platforms:linux_aarch64": ["lib/aarch64-linux-gcc/libSNPE.so"],
+        "//platforms:android_arm64": ["lib/aarch64-android-clang/libSNPE.so"],
+    }),
+    visibility = ["//visibility:public"],
+)
+```
+
+> 具体路径映射（`aarch64-linux-gcc` vs `aarch64-android-clang` 子目录名）以实际 SNPE SDK 版本为准，实现阶段调整。
+
+### 5.4 测试策略
+
+| 平台 | 测试方式 | 覆盖内容 |
+|------|----------|----------|
+| macOS / Linux x86_64 | `bazel test //tests/backend/snpe/...` | stub 路径：验证 `Load()` 返回 `kBackendNotFound`、`Infer()` 返回 `kNotInitialized`、`GetInputInfo()` 返回空列表、`IsLoaded()` 返回 `false` |
+| Linux aarch64 / Android arm64 | 手动验证（需连接开发板/设备） | 完整推理链路：加载 `.dlc` 模型 → `Infer()` → 验证输出形状与数值 |
+
+**stub 测试文件**：`tests/backend/snpe/snpe_backend_test.cc`，参考 `tests/backend/cpu/cpu_backend_test.cc` 结构。
+
+**stub 测试 BUILD 依赖条件**：`tests/backend/snpe/BUILD` 始终依赖 `//src/backend/snpe:snpe_backend`（stub 在非目标平台也可编译链接）。
+
+### 5.5 线程安全
+
+`SnpeBackend` 遵循 `IBackend` 接口声明——不要求线程安全。由 `ModelManager`（`model_manager.cc` 中的 `std::lock_guard<std::mutex>`）在外部保证串行化。
+
+### 5.6 预处理冲突
+
+SNPE `.dlc` 模型转换过程中可能内嵌标准化（mean/std）预处理。若清单中同时配置 `normalize` 字段，Pipeline 将自动插入 `NormalizeNode`，导致双重归一化。
+
+**约定**：约束层面解决——清单中配置 SNPE 后端的模型条目不应声明 `normalize` 字段。此约束记录于 `docs/phase4.md`（阶段四实现文档），不通过代码强制校验。
