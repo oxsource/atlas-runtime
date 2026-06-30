@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Print I/O metadata.
+    // Print I/O metadata and configuration.
     for (const auto& [name, handle] : std::vector<std::pair<std::string,
                                                   atlas::api::ModelHandle*>>{
              {"detector",   &detector},
@@ -101,6 +101,25 @@ int main(int argc, char* argv[]) {
                   << infos[0].name << "'  shape: [";
         for (int d : infos[0].shape) std::cout << d << ",";
         std::cout << "]\n";
+
+        // Config fields exposed by Proposal-006.
+        const int ls = handle->GetLoadStrategy();
+        std::cout << "[" << name << "] backend:      " << handle->GetBackend()    << "\n"
+                  << "[" << name << "] model_path:   " << handle->GetModelPath()  << "\n"
+                  << "[" << name << "] load_strategy: " << ls
+                  << " (" << (ls == 0 ? "eager" : "lazy") << ")\n";
+
+        const auto cfg = handle->GetConfig();
+        if (!cfg.empty()) {
+            std::cout << "[" << name << "] config:       {";
+            bool first = true;
+            for (const auto& [k, v] : cfg) {
+                if (!first) std::cout << ", ";
+                std::cout << k << ": " << v;
+                first = false;
+            }
+            std::cout << "}\n";
+        }
     }
 
     // ── Step 3: Prepare raw input image ─────────────────────────────────
