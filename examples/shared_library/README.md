@@ -12,10 +12,11 @@ This directory demonstrates how **non-Bazel** external projects can integrate wi
 ## Structure
 
 ```
-tests/external_consumer/
+examples/shared_library/
 ├── Makefile              # Build system for external project
 ├── main.cc               # Integration test code
 ├── manifest.json         # Test manifest (references identity model)
+├── identity_1x3x4x4.onnx # Identity ONNX model for inference
 └── README.md             # This file
 ```
 
@@ -31,7 +32,7 @@ tests/external_consumer/
 ls atlas-sdk/
 
 # Build the external consumer test
-cd tests/external_consumer
+cd examples/shared_library
 ATLAS_SDK=../../atlas-sdk/linux-x86_64 make
 
 # Run the test
@@ -55,7 +56,7 @@ Expected output:
 If Atlas is installed to system prefix (e.g., via `tools/install_atlas.sh /usr/local`):
 
 ```bash
-cd tests/external_consumer
+cd examples/shared_library
 
 # Build (auto-detects via pkg-config)
 make
@@ -71,7 +72,7 @@ make test
 ./tools/build_release.sh --platform linux_aarch64 --prefix ./atlas-sdk
 
 # Test with that SDK
-cd tests/external_consumer
+cd examples/shared_library
 ATLAS_SDK=../../atlas-sdk/linux-aarch64 make
 ATLAS_SDK=../../atlas-sdk/linux-aarch64 make test
 ```
@@ -107,7 +108,7 @@ The integration test (`main.cc`) verifies:
 
 ## Model Used
 
-- **File**: `../../backend/cpu/test_data/identity_1x3x4x4.onnx`
+- **File**: `identity_1x3x4x4.onnx` (included in this directory)
 - **Type**: Identity operator (output = input)
 - **Shape**: `[1, 3, 4, 4]` (batch=1, channels=3, height=4, width=4)
 - **Data Type**: Float32
@@ -156,8 +157,8 @@ LD_LIBRARY_PATH=./atlas-sdk/linux-x86_64/lib ./build/test_external_consumer mani
 
 **Solution**:
 ```bash
-# Ensure you run from tests/external_consumer/
-cd tests/external_consumer
+# Ensure you run from examples/shared_library/
+cd examples/shared_library
 
 # Or use absolute paths
 ATLAS_SDK=/full/path/to/atlas-sdk/linux-x86_64 make test
@@ -199,8 +200,7 @@ This external consumer test validates:
 
 - [`docs/phase6.md`](../../docs/phase6.md) - Public API and distribution
 - [`tools/build_release.sh`](../../tools/build_release.sh) - SDK build script
-- [`examples/two_model_pipeline/`](../../examples/two_model_pipeline/) - Bazel-based example
-- [`tests/public/`](../public/) - Bazel-based public API tests
+- [`examples/two_model_pipeline/`](../two_model_pipeline/) - Bazel-based example
 
 ## Future Enhancements
 
