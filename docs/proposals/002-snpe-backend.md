@@ -147,7 +147,7 @@ snpe_sdk_repo = repository_rule(
     implementation = _snpe_sdk_repo_impl,
     environ = ["SNPE_SDK_PATH"],
     local = True,
-    doc = "Creates @snpe_sdk from $SNPE_SDK_PATH via symlink (zero-copy).",
+    doc = "Cfreates @snpe_sdk from $SNPE_SDK_PATH via symlink (zero-copy).",
 )
 ```
 
@@ -368,6 +368,105 @@ SNPE 使用 `.dlc`（Deep Learning Container）格式模型。可通过 SNPE SDK
 | 目标平台 | Linux aarch64（嵌入式）、Android aarch64（移动设备） |
 | API 兼容性 | SDK 版本需与目标设备的 SNPE 运行时版本匹配（Qualcomm 无前向兼容保证） |
 | 模型转换 | `snpe-onnx-to-dlc` 的运行需要 Linux x86_64 + Python 3.8/3.10 |
+
+### SNPE SDK 版本适配（条件编译）
+
+ATLAS 通过编译宏 `ATLAS_SNPE_VERSION_MAJOR` 标识 SNPE SDK 主版本，当前默认值为 `2`（对应 2.x SDK 如 2.21.0），同时可适配 `1`（对应 1.x SDK 如 1.5.0）。代码通过该宏进行条件编译处理，实现两套 API 的版本适配。
+
+**版本宏机制：**
+
+| 宏名称 | 用途 | 取值 | 来源 |
+|--------|------|------|------|
+| `ATLAS_SNPE_ENABLED` | 控制 stub vs 完整实现（职责不变） | 定义 / 未定义 | BUILD `defines`，仅目标平台定义 |
+| `ATLAS_SNPE_VERSION_MAJOR` | 标识 SNPE SDK 主版本 | `1` 或 `2` | BUILD `defines` 默认 `2`；可通过 `--copt=-DATLAS_SNPE_VERSION_MAJOR=1` 覆盖 |
+
+**默认值链路：**
+
+1. `src/backend/snpe/BUILD` 中 `SNPE_PLATFORM` 同时定义 `ATLAS_SNPE_ENABLED=1` 和 `ATLAS_SNPE_VERSION_MAJOR=2`
+2. `snpe_backend.h` 在 `#ifdef ATLAS_SNPE_ENABLED` 块内做兜底：`#ifndef ATLAS_SNPE_VERSION_MAJOR` → `#define ATLAS_SNPE_VERSION_MAJOR 2`
+3. `.cc` 文件在完整实现路径内做合法性校验：`#if ATLAS_SNPE_VERSION_MAJOR != 1 && ATLAS_SNPE_VERSION_MAJOR != 2` → `#error`
+
+**切换版本的方式：**
+
+```bash
+# 默认 2.x
+bazel build --platforms=//platforms:linux_aarch64 //src/backend/snpe/...
+
+# 切换到 1.5.0
+bazel build --platforms=//platforms:linux_aarch64 \
+    --copt=-DATLAS_SNPE_VERSION_MAJOR=1 \
+    //src/backend/snpe/...
+```
+
+**SNPE 1.x vs 2.x API 差异及条件编译映射：**
+
+| 差异点 | SNPE 1.x (1.5.0) | SNPE 2.x (2.21.0) | 条件编译方式 |
+|--------|-------------------|-------------------|-------------|
+| Runtime 枚举 | `CPU_FLOAT`, `GPU_FLOAT`, `DSP_FIXED_TF` | `CPU_FLOAT32`, `GPU_FLOAT32_16_HYBRID`, `DSP_FIXED8_TF`, `AIP_FIXED8_TF` | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
+| AIP runtime | 不支持 | `AIP_FIXED8_TF` | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
+| Performance profile 扩展 | `BALANCED` ~ `BURST` | 增加 `LOW_POWER_SAVER`, `HIGH_POWER_SAVER`, `LOW_BALANCED`, `EXTREME_POWER_SAVER` | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
+| Tensor 迭代器 | `begin()` / `end()` (non-const) | `cbegin()` / `cend()` (const) | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
+| dtype 检测 | 无 `IOBufferDataType_t`，默认 float32 | `getInputOutputBufferAttributes()` → `IOBufferDataType_t` | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
+| 日志初始化 | `SNPEFactory::initializeLogging()` 无参 | `initializeLogging(LogLevel_t::LOG_WARN)` | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
+| 头文件 include 布局 | `include/zdl/SNPE/SNPE.hpp`（嵌套在 zdl/ 下） | `include/SNPE/SNPE/SNPE.hpp`（嵌套在 SNPE/ 下） | `snpe.BUILD` 的 `includes` 双路径覆盖（`include/SNPE` + `include/zdl`） |
+| `.so` 子目录名 | `aarch64-linux-gcc/`, `aarch64-android-clang/` | `aarch64-oe-linux-gcc8.2/`, `aarch64-android/` | `snpe.BUILD` glob 双模式匹配 |
+
+**条件编译代码模式：**
+
+```cpp
+// snpe_backend.cc（完整实现路径内）
+
+// Runtime enum selection:
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+    return static_cast<int>(DlSystem::Runtime_t::CPU_FLOAT32);
+#else
+    return static_cast<int>(DlSystem::Runtime_t::CPU_FLOAT);
+#endif
+
+// Tensor iteration:
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+    auto raw_ptr = out_itensor->cbegin();  // 2.x: const iterator
+#else
+    auto raw_ptr = out_itensor->begin();   // 1.x: non-const iterator
+#endif
+
+// Dtype detection:
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+    auto opt_attr = impl_->snpe->getInputOutputBufferAttributes(name.c_str());
+    if (opt_attr && *opt_attr != nullptr) {
+        info.dtype = SnpeDtypeToAtlas((*opt_attr)->getBufferPrecision());
+    } else {
+        info.dtype = utils::DataType::kFloat32;
+    }
+#else
+    info.dtype = utils::DataType::kFloat32;  // 1.x: no dtype introspection
+#endif
+```
+
+**`snpe.BUILD` 版本双路径覆盖：**
+
+```python
+cc_library(
+    name = "snpe",
+    hdrs = glob(["snpe_sdk_root/include/**/*.hpp"]),
+    includes = [
+        "snpe_sdk_root/include/SNPE",     # 2.x layout
+        "snpe_sdk_root/include",          # 1.x layout (fallback)
+    ],
+    srcs = select({
+        "//platforms:linux_aarch64": glob([
+            "snpe_sdk_root/lib/aarch64-oe-linux-gcc8.2/*.so",   # 2.x
+            "snpe_sdk_root/lib/aarch64-linux-gcc/*.so",          # 1.x
+        ]),
+        "//platforms:android_arm64": glob([
+            "snpe_sdk_root/lib/aarch64-android/*.so",            # 2.x
+            "snpe_sdk_root/lib/aarch64-android-clang/*.so",      # 1.x
+        ]),
+    }),
+)
+```
+
+> `glob()` 的多个 pattern 之间是 OR 关系——只要任一 pattern 匹配到文件即被包含。1.x 和 2.x 的 `.so` 子目录名不同，同时列出两个 pattern 即可覆盖两套 SDK 的目录布局。`includes` 同时列出两个 include 路径前缀，编译器按顺序查找。
 
 ## 三、影响范围
 

@@ -3,8 +3,14 @@
 # All other platforms (macOS / Linux x86_64): stub compiles, no SDK dependency.
 
 SNPE_PLATFORM = select({
-    "//platforms:linux_aarch64": ["ATLAS_SNPE_ENABLED=1"],
-    "//platforms:android_arm64": ["ATLAS_SNPE_ENABLED=1"],
+    "//platforms:linux_aarch64": [
+        "ATLAS_SNPE_ENABLED=1",
+        "ATLAS_SNPE_VERSION_MAJOR=1",
+    ],
+    "//platforms:android_arm64": [
+        "ATLAS_SNPE_ENABLED=1",
+        "ATLAS_SNPE_VERSION_MAJOR=1",
+    ],
     "//conditions:default": [],
 })
 

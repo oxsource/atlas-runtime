@@ -15,6 +15,12 @@ constexpr std::string_view kBackendType = "snpe";
 
 // === Full implementation (Linux aarch64 / Android arm64 + SNPE SDK) ===
 
+#if ATLAS_SNPE_VERSION_MAJOR != 1 && ATLAS_SNPE_VERSION_MAJOR != 2
+#error "ATLAS_SNPE_VERSION_MAJOR must be 1 or 2"
+#endif
+
+// SNPE 1.x headers may use a different include layout than 2.x.
+// Both versions expose SNPEFactory.hpp and DlEnums.hpp under the same paths.
 #include "DlSystem/DlEnums.hpp"
 #include "SNPE/SNPEFactory.hpp"
 
@@ -39,10 +45,20 @@ utils::ErrorCode SnpeBackendContext::Init(
     // fields (runtime, performance_profile, use_buffer) are ignored.
     (void)config;
 
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+    // 2.x: DlSystem::LogLevel_t::LOG_WARN
     if (!SNPE::SNPEFactory::initializeLogging(
             DlSystem::LogLevel_t::LOG_WARN)) {
         return utils::ErrorCode::kInferFailed;
     }
+#else
+    // 1.x: logging level enum may use a different naming or may not
+    // provide LogLevel_t. Fall back to conservative defaults.
+    // SNPEFactory::initializeLogging() in 1.x takes no arguments.
+    if (!SNPE::SNPEFactory::initializeLogging()) {
+        return utils::ErrorCode::kInferFailed;
+    }
+#endif
 
     initialized_ = true;
     return utils::ErrorCode::kOk;

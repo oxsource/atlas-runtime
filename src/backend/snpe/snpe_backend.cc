@@ -13,6 +13,13 @@ namespace backend {
 
 #ifdef ATLAS_SNPE_ENABLED
 
+// -----------------------------------------------------------------------
+// Version guard — must be 1 or 2.
+// -----------------------------------------------------------------------
+#if ATLAS_SNPE_VERSION_MAJOR != 1 && ATLAS_SNPE_VERSION_MAJOR != 2
+#error "ATLAS_SNPE_VERSION_MAJOR must be 1 or 2"
+#endif
+
 #include "DlContainer/IDlContainer.hpp"
 #include "DlSystem/DlEnums.hpp"
 #include "DlSystem/IBufferAttributes.hpp"
@@ -39,6 +46,7 @@ constexpr char kRuntimeDsp[] ATLAS_MAYBE_UNUSED = "dsp";
 constexpr char kRuntimeAip[] ATLAS_MAYBE_UNUSED = "aip";
 
 // Performance profile name strings accepted from manifest config.
+// v2.x-only profiles are guarded with ATLAS_SNPE_VERSION_MAJOR.
 constexpr char kPerfDefault[] ATLAS_MAYBE_UNUSED            = "default";
 constexpr char kPerfBalanced[] ATLAS_MAYBE_UNUSED           = "balanced";
 constexpr char kPerfHighPerformance[] ATLAS_MAYBE_UNUSED    = "high_performance";
@@ -46,10 +54,23 @@ constexpr char kPerfPowerSaver[] ATLAS_MAYBE_UNUSED         = "power_saver";
 constexpr char kPerfSystemSettings[] ATLAS_MAYBE_UNUSED     = "system_settings";
 constexpr char kPerfSustainedHighPerf[] ATLAS_MAYBE_UNUSED  = "sustained_high_performance";
 constexpr char kPerfBurst[] ATLAS_MAYBE_UNUSED              = "burst";
+
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
 constexpr char kPerfLowPowerSaver[] ATLAS_MAYBE_UNUSED      = "low_power_saver";
 constexpr char kPerfHighPowerSaver[] ATLAS_MAYBE_UNUSED     = "high_power_saver";
 constexpr char kPerfLowBalanced[] ATLAS_MAYBE_UNUSED        = "low_balanced";
 constexpr char kPerfExtremePowerSaver[] ATLAS_MAYBE_UNUSED  = "extreme_power_saver";
+#endif
+
+// Runtime-to-enum mapping differs between SNPE 1.x and 2.x.
+// -----------------------------------------------------------------------
+// | Config key | SNPE 1.x                 | SNPE 2.x                      |
+// |------------|---------------------------|----------------------------------|
+// | cpu        | CPU_FLOAT              | CPU_FLOAT32                   |
+// | gpu        | GPU_FLOAT              | GPU_FLOAT32_16_HYBRID         |
+// | dsp        | DSP_FIXED_TF           | DSP_FIXED8_TF                 |
+// | aip        | (not available)        | AIP_FIXED8_TF                 |
+// -----------------------------------------------------------------------
 
 }  // namespace
 
@@ -64,12 +85,36 @@ namespace {
 
 ATLAS_MAYBE_UNUSED
 int ParseRuntime(const std::string& runtime_str) {
-    if (runtime_str == kRuntimeCpu) return static_cast<int>(DlSystem::Runtime_t::CPU_FLOAT32);
-    if (runtime_str == kRuntimeGpu) return static_cast<int>(DlSystem::Runtime_t::GPU_FLOAT32_16_HYBRID);
-    if (runtime_str == kRuntimeDsp) return static_cast<int>(DlSystem::Runtime_t::DSP_FIXED8_TF);
-    if (runtime_str == kRuntimeAip) return static_cast<int>(DlSystem::Runtime_t::AIP_FIXED8_TF);
-    // Default: GPU.
+    if (runtime_str == kRuntimeCpu) {
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+        return static_cast<int>(DlSystem::Runtime_t::CPU_FLOAT32);
+#else
+        return static_cast<int>(DlSystem::Runtime_t::CPU_FLOAT);
+#endif
+    }
+    if (runtime_str == kRuntimeGpu) {
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+        return static_cast<int>(DlSystem::Runtime_t::GPU_FLOAT32_16_HYBRID);
+#else
+        return static_cast<int>(DlSystem::Runtime_t::GPU_FLOAT);
+#endif
+    }
+    if (runtime_str == kRuntimeDsp) {
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+        return static_cast<int>(DlSystem::Runtime_t::DSP_FIXED8_TF);
+#else
+        return static_cast<int>(DlSystem::Runtime_t::DSP_FIXED_TF);
+#endif
+    }
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+    if (runtime_str == kRuntimeAip) {
+        return static_cast<int>(DlSystem::Runtime_t::AIP_FIXED8_TF);
+    }
     return static_cast<int>(DlSystem::Runtime_t::GPU_FLOAT32_16_HYBRID);
+#else
+    // 1.x has no AIP runtime; default to GPU.
+    return static_cast<int>(DlSystem::Runtime_t::GPU_FLOAT);
+#endif
 }
 
 ATLAS_MAYBE_UNUSED
@@ -93,6 +138,8 @@ int ParsePerformanceProfile(const std::string& profile_str) {
     if (profile_str == kPerfBurst) {
         return static_cast<int>(DlSystem::PerformanceProfile_t::BURST);
     }
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+    // These performance profiles were introduced in SNPE 2.x.
     if (profile_str == kPerfLowPowerSaver) {
         return static_cast<int>(DlSystem::PerformanceProfile_t::LOW_POWER_SAVER);
     }
@@ -105,11 +152,14 @@ int ParsePerformanceProfile(const std::string& profile_str) {
     if (profile_str == kPerfExtremePowerSaver) {
         return static_cast<int>(DlSystem::PerformanceProfile_t::EXTREME_POWER_SAVER);
     }
+#endif
     // Default: BALANCED.
     return static_cast<int>(DlSystem::PerformanceProfile_t::BALANCED);
 }
 
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
 // Converts an SNPE IOBufferDataType_t to atlas DataType.
+// IOBufferDataType_t was introduced in SNPE 2.x.
 ATLAS_MAYBE_UNUSED
 utils::DataType SnpeDtypeToAtlas(DlSystem::IOBufferDataType_t snpe_dtype) {
     switch (snpe_dtype) {
@@ -148,6 +198,7 @@ size_t SnpeElementByteSize(DlSystem::IOBufferDataType_t t) {
         default:                                              return 0;
     }
 }
+#endif  // ATLAS_SNPE_VERSION_MAJOR >= 2
 
 }  // namespace
 
@@ -176,7 +227,12 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
     }
 
     // 2. Extract per-model parameters from config.
-    auto runtime = DlSystem::Runtime_t::GPU_FLOAT32_16_HYBRID;
+    DlSystem::Runtime_t runtime;
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+    runtime = DlSystem::Runtime_t::GPU_FLOAT32_16_HYBRID;
+#else
+    runtime = DlSystem::Runtime_t::GPU_FLOAT;
+#endif
     {
         auto it = config.config.find(kConfigRuntime);
         if (it != config.config.end()) {
@@ -338,9 +394,15 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
         out.data      = malloc(byte_size);
         out.owns_data = true;
 
-        // SNPE ITensor data is owned by the tensor; copy out.
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+        // 2.x: const_iterator via cbegin() / cend().
         auto raw_ptr = out_itensor->cbegin();
         std::memcpy(out.data, &(*raw_ptr), byte_size);
+#else
+        // 1.x: non-const iterator via begin() / end().
+        auto raw_ptr = out_itensor->begin();
+        std::memcpy(out.data, &(*raw_ptr), byte_size);
+#endif
 
         outputs.push_back(std::move(out));
     }
@@ -389,7 +451,8 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
             info.shape.push_back(static_cast<int>(dims[r]));
         }
 
-        // Attempt to detect dtype from buffer attributes.
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
+        // 2.x: attempt to detect dtype from buffer attributes.
         auto opt_attr = impl_->snpe->getInputOutputBufferAttributes(name.c_str());
         if (opt_attr && *opt_attr != nullptr) {
             auto* attr = *opt_attr;
@@ -397,9 +460,12 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
                 attr->getBufferPrecision();
             info.dtype = SnpeDtypeToAtlas(buf_dtype);
         } else {
-            // Fallback: assume float32.
             info.dtype = utils::DataType::kFloat32;
         }
+#else
+        // 1.x: no IOBufferDataType_t; default to float32.
+        info.dtype = utils::DataType::kFloat32;
+#endif
 
         input_info_.push_back(std::move(info));
     }
@@ -416,6 +482,7 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
             info.shape.push_back(static_cast<int>(dims[r]));
         }
 
+#if ATLAS_SNPE_VERSION_MAJOR >= 2
         auto opt_attr = impl_->snpe->getInputOutputBufferAttributes(name.c_str());
         if (opt_attr && *opt_attr != nullptr) {
             auto* attr = *opt_attr;
@@ -425,6 +492,9 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
         } else {
             info.dtype = utils::DataType::kFloat32;
         }
+#else
+        info.dtype = utils::DataType::kFloat32;
+#endif
 
         output_info_.push_back(std::move(info));
     }

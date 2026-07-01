@@ -15,6 +15,12 @@ namespace backend {
 class SnpeBackendContext;
 
 #ifdef ATLAS_SNPE_ENABLED
+
+// SNPE SDK major version guard — defaults to 2 if not specified at build time.
+#ifndef ATLAS_SNPE_VERSION_MAJOR
+#define ATLAS_SNPE_VERSION_MAJOR 2
+#endif
+
 // Opaque implementation struct holding SNPE SDK resources.
 // Defined in snpe_backend.cc to avoid leaking SNPE headers.
 struct SnpeImpl;
