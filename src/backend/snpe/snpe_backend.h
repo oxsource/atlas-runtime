@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,12 @@ namespace atlas {
 namespace backend {
 
 class SnpeBackendContext;
+
+#ifdef ATLAS_SNPE_ENABLED
+// Opaque implementation struct holding SNPE SDK resources.
+// Defined in snpe_backend.cc to avoid leaking SNPE headers.
+struct SnpeImpl;
+#endif
 
 // SNPE inference backend — loads .dlc models and runs inference
 // on Qualcomm DSP / GPU / AIP.
@@ -36,6 +43,11 @@ class SnpeBackend : public IBackend {
     bool IsLoaded() const override;
 
  private:
+    // Reads input/output metadata from the loaded SNPE network into
+    // input_info_ / output_info_ and populates impl_->input_names /
+    // impl_->output_names.
+    utils::ErrorCode BuildTensorInfos();
+
     // Non-owning pointer to the shared SNPE context (borrowed from ModelManager).
     SnpeBackendContext* active_ctx_ = nullptr;
 
@@ -43,6 +55,10 @@ class SnpeBackend : public IBackend {
     std::vector<utils::TensorInfo> output_info_;
 
     bool loaded_ = false;
+
+#ifdef ATLAS_SNPE_ENABLED
+    std::unique_ptr<SnpeImpl> impl_;
+#endif
 };
 
 }  // namespace backend

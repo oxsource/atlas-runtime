@@ -5,6 +5,17 @@
 #include <string>
 #include <vector>
 
+// Suppress -Wunused-const-variable / -Wunused-function warnings for
+// symbols that are only referenced under conditional compilation
+// (e.g. backend-specific constants inside #ifdef blocks).
+#if defined(__cplusplus) && (__cplusplus >= 201703L)
+#define ATLAS_MAYBE_UNUSED [[maybe_unused]]
+#elif defined(__GNUC__) || defined(__clang__)
+#define ATLAS_MAYBE_UNUSED __attribute__((unused))
+#else
+#define ATLAS_MAYBE_UNUSED
+#endif
+
 namespace atlas {
 namespace utils {
 

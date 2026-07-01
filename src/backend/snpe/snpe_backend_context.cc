@@ -15,7 +15,16 @@ constexpr std::string_view kBackendType = "snpe";
 
 // === Full implementation (Linux aarch64 / Android arm64 + SNPE SDK) ===
 
+#include "DlSystem/DlEnums.hpp"
+#include "SNPE/SNPEFactory.hpp"
+
 SnpeBackendContext::SnpeBackendContext() = default;
+
+SnpeBackendContext::~SnpeBackendContext() {
+    if (initialized_) {
+        SNPE::SNPEFactory::terminateLogging();
+    }
+}
 
 std::string_view SnpeBackendContext::BackendType() const {
     return kBackendType;
@@ -24,8 +33,17 @@ std::string_view SnpeBackendContext::BackendType() const {
 utils::ErrorCode SnpeBackendContext::Init(
     const std::unordered_map<std::string, std::string>& config) {
     if (initialized_) return utils::ErrorCode::kOk;
-    // TODO(pizzk): Initialize SNPE global runtime (SNPEFactory::InitializeLogging, etc.)
-    // using global config fields extracted from |config|.
+
+    // Initialize SNPE logging at WARN level. Only global config fields
+    // (e.g. log_level) would be extracted from |config| here; per-model
+    // fields (runtime, performance_profile, use_buffer) are ignored.
+    (void)config;
+
+    if (!SNPE::SNPEFactory::initializeLogging(
+            DlSystem::LogLevel_t::LOG_WARN)) {
+        return utils::ErrorCode::kInferFailed;
+    }
+
     initialized_ = true;
     return utils::ErrorCode::kOk;
 }
@@ -36,12 +54,15 @@ utils::ErrorCode SnpeBackendContext::Init(
 
 SnpeBackendContext::SnpeBackendContext() = default;
 
+SnpeBackendContext::~SnpeBackendContext() = default;
+
 std::string_view SnpeBackendContext::BackendType() const {
     return kBackendType;
 }
 
 utils::ErrorCode SnpeBackendContext::Init(
     const std::unordered_map<std::string, std::string>& config) {
+    (void)config;
     return utils::ErrorCode::kBackendNotFound;
 }
 

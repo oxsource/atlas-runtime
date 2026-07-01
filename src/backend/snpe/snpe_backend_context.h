@@ -19,7 +19,7 @@ namespace backend {
 class SnpeBackendContext : public IBackendContext {
  public:
     SnpeBackendContext();
-    ~SnpeBackendContext() override = default;
+    ~SnpeBackendContext() override;
 
     std::string_view BackendType() const override;
 

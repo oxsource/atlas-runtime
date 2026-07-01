@@ -5,28 +5,25 @@
 #   1. Set SNPE_SDK_PATH environment variable to the SNPE SDK installation directory.
 #   2. Build with: SNPE_SDK_PATH=/path/to/snpe-sdk bazel build //...
 #
-# Note: .so glob patterns below assume the typical SNPE SDK layout.
-# Adjust subdirectory names (aarch64-linux-gcc / aarch64-android-clang) to match
-# the actual SDK version you have installed.
-#
-# Layout assumption:
+# Verified with: SNPE SDK 2.21.0.240401
+# Layout:
 #   <SNPE_SDK_PATH>/
-#     include/zdl/SNPE/SNPE.hpp
-#     include/zdl/DlSystem/DlSystem.hpp
+#     include/SNPE/SNPE/SNPE.hpp
+#     include/SNPE/DlSystem/DlSystem.hpp
 #     lib/
-#       aarch64-linux-gcc/libSNPE.so
-#       aarch64-android-clang/libSNPE.so
+#       aarch64-oe-linux-gcc8.2/libSNPE.so   (Linux aarch64, OE toolchain)
+#       aarch64-android/libSNPE.so            (Android arm64)
 
 cc_library(
     name = "snpe",
-    hdrs = glob(["snpe_sdk_root/include/zdl/**/*.hpp"]),
-    includes = ["snpe_sdk_root/include"],
+    hdrs = glob(["snpe_sdk_root/include/SNPE/**/*.hpp"]),
+    includes = ["snpe_sdk_root/include/SNPE"],
     srcs = select({
         "//platforms:linux_aarch64": glob(
-            ["snpe_sdk_root/lib/aarch64-linux-gcc/*.so"],
+            ["snpe_sdk_root/lib/aarch64-oe-linux-gcc8.2/*.so"],
         ),
         "//platforms:android_arm64": glob(
-            ["snpe_sdk_root/lib/aarch64-android-clang/*.so"],
+            ["snpe_sdk_root/lib/aarch64-android/*.so"],
         ),
         "//conditions:default": [],
     }),
