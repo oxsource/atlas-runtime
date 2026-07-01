@@ -352,6 +352,7 @@ CpuBackend::Infer(inputs, outputs)
 | Proposal | 日期 | 简述 | 状态 |
 |----------|------|------|------|
 | [Proposal-001](proposals/001-pipeline-manifest-config.md) | 2026-06-26 | Manifest 自由配置 Pipeline | 已采纳 |
+| [Proposal-002](proposals/002-snpe-backend.md) | 2026-06-26 | SNPE 后端接入 | 已采纳 |
 
 ---
 
@@ -359,3 +360,7 @@ CpuBackend::Infer(inputs, outputs)
 
 | BUG | 日期 | 简述 | 等级 | 状态 |
 |-----|------|------|------|------|
+
+---
+
+> **【补充】** Proposal-002 | 2026-06-26 | SNPE 后端接入，在阶段二建立的后端抽象层（IBackend / IBackendContext / BackendFactory）基础上新增 SnpeBackend + SnpeBackendContext，通过条件编译 + stub 降级方案实现跨平台兼容。详细设计见 docs/proposals/002-snpe-backend.md。

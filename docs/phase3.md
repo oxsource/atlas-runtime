@@ -462,3 +462,9 @@ tests/
 | BUG | 日期 | 简述 | 等级 | 状态 |
 |-----|------|------|------|------|
 | [BUG-001](bugfixes/BUG-001-missing-onnxruntime-linux-soname.md) | 2026-06-30 | Linux 平台 ONNX Runtime SONAME 缺失导致 5 个测试失败 | P0 | 已修复 |
+
+---
+
+> **【补充】** Proposal-006 | 2026-06-30 | ModelHandle 新增 GetBackend() / GetModelPath() / GetLoadStrategy() / GetConfig() 四个只读查询方法。详细设计见 docs/proposals/006-model-config-public-api.md。
+
+> **【补充】** Proposal-007 | 2026-06-30 | third_party/ 按第三方库类型分目录管理（nlohmann_json/、onnxruntime/、snpe/），atlas_deps.bzl 同步更新 build_file Label。详细设计见 docs/proposals/007-third-party-dir-restructuring.md。

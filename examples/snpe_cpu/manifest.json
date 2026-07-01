@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "name": "snpe-cpu-demo",
+  "models": [
+    {
+      "id": "snpe_identity",
+      "name": "SNPE Identity Model (CPU Runtime)",
+      "backend": "snpe",
+      "model_path": "${SAMPLE_MODEL_DIR}/identity_snpe.dlc",
+      "load_strategy": "eager",
+      "inputs": [
+        {
+          "name": "images",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32",
+          "layout": "NCHW"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32"
+        }
+      ],
+      "config": {
+        "runtime": "cpu"
+      }
+    }
+  ]
+}

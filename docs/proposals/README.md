@@ -20,9 +20,9 @@ NNN-short-kebab-title.md
 | 编号 | 标题 | 状态 |
 |------|------|------|
 | [001](001-pipeline-manifest-config.md) | Manifest 自由配置 Pipeline | 已采纳 |
-| [002](002-snpe-backend.md) | SNPE 后端接入 | 草案 |
+| [002](002-snpe-backend.md) | SNPE 后端接入 | 已采纳 |
 | [003](003-platform-build-refinement.md) | 精细化平台构建方案 | 已采纳 |
 | [004](004-android-platform-support.md) | Android 平台构建支持 | 已采纳 |
 | [005](005-release-script-and-makefile-test.md) | 脚本编译输出与 Makefile 集成测试 | 已采纳 |
-| [006](006-model-config-public-api.md) | ModelHandle 暴露 ModelConfig 关键字段 | 草案 |
-| [007](007-third-party-dir-restructuring.md) | 三方库目录按类型分文件夹管理 | 草案 |
+| [006](006-model-config-public-api.md) | ModelHandle 暴露 ModelConfig 关键字段 | 已采纳 |
+| [007](007-third-party-dir-restructuring.md) | 三方库目录按类型分文件夹管理 | 已采纳 |
