@@ -28,6 +28,8 @@ DtypeConvert → Resize → BGRToRGB → HWCToCHW → Normalize
 在 manifest 的 `inputs[]` 和 `outputs[]` 中新增可选的 `pipeline` 字段，允许用户以声明式方式定义预处理 / 后处理节点链。同时保留现有自动构建逻辑作为默认行为（向后兼容）。
 
 > **唯一性约束**：同一 `pipeline` 数组内的节点 `name` 必须唯一，`ManifestParser` 在解析时检测重复并返回 `kParseError`。
+>
+> **禁用自动填充**：新增 `disable_pipeline`（布尔，默认 `false`）字段。设为 `true` 时，跳过 `BuildInputPipeline` 自动构建，用户必须通过 `pipeline` 数组显式声明节点链；若同时省略 `pipeline` 数组，则该输入无预处理（直通 identity）。参见下文「禁用自动填充」章节。
 
 核心思路：
 
@@ -236,6 +238,82 @@ if (j.contains(kKeyPipeline) && j[kKeyPipeline].is_array()) {
 ```
 
 公共模块同步方式：在 `src/public/include/atlas/` 下不直接放置该文档（避免头文件目录混入 .md），而是在 `src/public/BUILD` 中通过 `data` 属性暴露 `src/pipeline/nodes/README.md`，或在 `tools/install_atlas.sh` 安装时一并复制到 `${PREFIX}/share/atlas/pipeline_nodes.md`。
+
+### 禁用自动填充（disable_pipeline）
+
+默认情况下，若未声明 `pipeline` 数组，`ModelManager::Init()` 会自动调用 `BuildInputPipeline` 构建默认预处理链。当输入数据已是模型可直接消费的格式（例如已做归一化的张量，或模型不需要预处理）时，自动构建会产生多余节点甚至错误。
+
+新增 `disable_pipeline` 布尔字段（默认 `false`），语义如下：
+
+| `disable_pipeline` | `pipeline` | 行为 |
+|---|---|---|
+| `false`（默认）| 不存在 | 自动构建（向后兼容） |
+| `false`（默认）| `[...]` 非空 | 用户声明构建 |
+| `true` | 不存在或 `[]` | 无 Pipeline（identity 直通） |
+| `true` | `[...]` 非空 | 用户声明构建 |
+
+判断优先级：**显式 pipeline 数组 > disable_pipeline > 自动构建**。
+
+**示例 — 禁用自动构建，手动编排：**
+
+```json
+{
+  "inputs": [
+    {
+      "name": "images",
+      "shape": [1, 3, 224, 224],
+      "dtype": "float32",
+      "layout": "NCHW",
+      "disable_pipeline": true,
+      "pipeline": [
+        { "name": "hwc_to_chw" },
+        { "name": "normalize", "params": { "mean": [0.5], "std": [0.5] } }
+      ]
+    }
+  ]
+}
+```
+
+**示例 — 完全禁用预处理（直通）：**
+
+```json
+{
+  "inputs": [
+    {
+      "name": "features",
+      "shape": [1, 512],
+      "dtype": "float32",
+      "disable_pipeline": true
+    }
+  ]
+}
+```
+
+**数据结构变更（`ManifestTensorInfo`）：**
+
+```cpp
+struct ManifestTensorInfo {
+    // ... existing fields ...
+    bool disable_pipeline = false;  // NEW
+    std::vector<ManifestPipelineNode> pipeline;
+};
+```
+
+**构建逻辑变更（`ModelManager::Init`）：**
+
+```cpp
+for (const auto& input : model.inputs) {
+    if (!input.pipeline.empty()) {
+        entry.input_pipelines.push_back(
+            pipeline::Pipeline::BuildFromManifest(input.pipeline));
+    } else if (input.disable_pipeline) {
+        entry.input_pipelines.push_back(pipeline::Pipeline{});  // identity
+    } else {
+        entry.input_pipelines.push_back(
+            pipeline::Pipeline::BuildInputPipeline(input.ToTensorInfo()));
+    }
+}
+```
 
 ## 三、影响范围
 

@@ -150,6 +150,78 @@ TEST_F(ManifestParserTest, ExpandsEnvironmentVariableInModelPath) {
     unsetenv("MODEL_DIR");
 }
 
+TEST_F(ManifestParserTest, ParsesDisablePipelineField) {
+    const std::string json_content = R"({
+        "version": "1.0",
+        "name": "disable-pipeline-app",
+        "models": [{
+            "id": "m",
+            "backend": "onnx",
+            "model_path": "/tmp/model.onnx",
+            "inputs": [{
+                "name": "x",
+                "shape": [1, 3, 224, 224],
+                "dtype": "float32",
+                "disable_pipeline": true
+            }],
+            "outputs": [{
+                "name": "y",
+                "shape": [1, 1000],
+                "dtype": "float32"
+            }]
+        }]
+    })";
+
+    const std::string tmp_path = "/tmp/atlas_disable_pipeline_manifest.json";
+    {
+        std::ofstream f(tmp_path);
+        f << json_content;
+    }
+
+    ManifestConfig config;
+    ASSERT_EQ(parser_.Parse(tmp_path, &config), utils::ErrorCode::kOk);
+
+    ASSERT_EQ(config.models.size(), 1u);
+    ASSERT_EQ(config.models[0].inputs.size(), 1u);
+    EXPECT_TRUE(config.models[0].inputs[0].disable_pipeline);
+    EXPECT_TRUE(config.models[0].inputs[0].pipeline.empty());
+}
+
+TEST_F(ManifestParserTest, DisablePipelineDefaultsToFalse) {
+    const std::string json_content = R"({
+        "version": "1.0",
+        "name": "default-app",
+        "models": [{
+            "id": "m",
+            "backend": "onnx",
+            "model_path": "/tmp/model.onnx",
+            "inputs": [{
+                "name": "x",
+                "shape": [1, 3, 224, 224],
+                "dtype": "float32"
+            }],
+            "outputs": [{
+                "name": "y",
+                "shape": [1, 1000],
+                "dtype": "float32"
+            }]
+        }]
+    })";
+
+    const std::string tmp_path = "/tmp/atlas_default_pipeline_manifest.json";
+    {
+        std::ofstream f(tmp_path);
+        f << json_content;
+    }
+
+    ManifestConfig config;
+    ASSERT_EQ(parser_.Parse(tmp_path, &config), utils::ErrorCode::kOk);
+
+    ASSERT_EQ(config.models.size(), 1u);
+    ASSERT_EQ(config.models[0].inputs.size(), 1u);
+    EXPECT_FALSE(config.models[0].inputs[0].disable_pipeline);
+}
+
 TEST_F(ManifestParserTest, ReturnsInvalidArgumentForUndefinedEnvVar) {
     unsetenv("ATLAS_UNDEFINED_VAR_XYZ");
 

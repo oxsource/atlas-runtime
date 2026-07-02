@@ -42,12 +42,14 @@ utils::ErrorCode ModelManager::Init(const ManifestConfig& manifest) {
         entry.config   = model;
         entry.backend  = std::move(backend_instance);
         // Build per-input preprocessing pipeline and per-output postprocessing
-        // pipeline. When a manifest declares an explicit node chain, use it;
-        // otherwise fall back to the default auto-built input pipeline.
+        // pipeline. Priority: explicit pipeline array > disable_pipeline flag
+        // > auto-built input pipeline.
         for (const auto& input : model.inputs) {
             if (!input.pipeline.empty()) {
                 entry.input_pipelines.push_back(
                     pipeline::Pipeline::BuildFromManifest(input.pipeline));
+            } else if (input.disable_pipeline) {
+                entry.input_pipelines.push_back(pipeline::Pipeline{});  // identity
             } else {
                 entry.input_pipelines.push_back(
                     pipeline::Pipeline::BuildInputPipeline(input.ToTensorInfo()));

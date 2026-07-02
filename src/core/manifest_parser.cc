@@ -76,8 +76,9 @@ constexpr const char* kKeyMean      = "mean";
 constexpr const char* kKeyStd       = "std";
 
 // Pipeline-level keys (optional "pipeline" array on inputs/outputs).
-constexpr const char* kKeyPipeline = "pipeline";
-constexpr const char* kKeyParams   = "params";
+constexpr const char* kKeyPipeline         = "pipeline";
+constexpr const char* kKeyDisablePipeline  = "disable_pipeline";
+constexpr const char* kKeyParams           = "params";
 
 // ---------------------------------------------------------------------------
 // Helper functions
@@ -179,6 +180,11 @@ utils::ErrorCode ParseTensorInfo(const nlohmann::json& j,
                 info->normalize.std.push_back(v.get<float>());
             }
         }
+    }
+
+    // Optional: when true, skip automatic BuildInputPipeline.
+    if (j.contains(kKeyDisablePipeline) && j[kKeyDisablePipeline].is_boolean()) {
+        info->disable_pipeline = j[kKeyDisablePipeline].get<bool>();
     }
 
     // Optional: explicit pipeline node chain.  Empty = auto-build.

@@ -32,6 +32,9 @@ struct ManifestTensorInfo {
     std::string layout = "NCHW";
     bool has_normalize = false;
     utils::NormalizeParams normalize;
+    // When true, skip automatic BuildInputPipeline.  The user must either
+    // provide an explicit |pipeline| array or accept an identity pipeline.
+    bool disable_pipeline = false;
     // Optional: explicit pipeline node chain. Empty = auto-build.
     std::vector<ManifestPipelineNode> pipeline;
 
