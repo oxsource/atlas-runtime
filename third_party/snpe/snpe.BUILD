@@ -40,11 +40,11 @@ cc_library(
     name = "snpe",
     hdrs = glob(["snpe_sdk_root/include/**/*.hpp"]),
     includes = select({
-        "//platforms:linux_aarch64": [
+        "@//platforms:linux_aarch64": [
             "snpe_sdk_root/include/SNPE",     # 2.x: include/SNPE/<rest>
             "snpe_sdk_root/include/zdl",      # 1.x: include/zdl/<rest>
         ],
-        "//platforms:android_arm64": [
+        "@//platforms:android_arm64": [
             "snpe_sdk_root/include/SNPE",     # 2.x: include/SNPE/<rest>
             "snpe_sdk_root/include/zdl",      # 1.x: include/zdl/<rest>
         ],
@@ -54,13 +54,13 @@ cc_library(
         ],
     }),
     srcs = select({
-        "//platforms:linux_aarch64": glob(
+        "@//platforms:linux_aarch64": glob(
             [
                 "snpe_sdk_root/lib/aarch64-oe-linux-gcc8.2/*.so",    # 2.x
                 "snpe_sdk_root/lib/aarch64-linux-gcc*/*.so",          # 1.x (gcc4.9 etc.)
             ],
         ),
-        "//platforms:android_arm64": glob(
+        "@//platforms:android_arm64": glob(
             [
                 "snpe_sdk_root/lib/aarch64-android/*.so",             # 2.x
                 "snpe_sdk_root/lib/aarch64-android-clang*/*.so",      # 1.x (clang6.0 etc.)
