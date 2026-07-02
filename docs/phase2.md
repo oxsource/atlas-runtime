@@ -363,4 +363,6 @@ CpuBackend::Infer(inputs, outputs)
 
 ---
 
+> **【补充】** Proposal-001 | 2026-06-26 | Manifest 自由配置 Pipeline，在清单文件中新增可选的 `pipeline` 字段，允许用户声明式定义预处理 / 后处理节点链；同时保留现有自动构建逻辑作为默认行为（向后兼容）。详细设计见 docs/proposals/001-pipeline-manifest-config.md。
+
 > **【补充】** Proposal-002 | 2026-06-26 | SNPE 后端接入，在阶段二建立的后端抽象层（IBackend / IBackendContext / BackendFactory）基础上新增 SnpeBackend + SnpeBackendContext，通过条件编译 + stub 降级方案实现跨平台兼容。详细设计见 docs/proposals/002-snpe-backend.md。

@@ -822,3 +822,17 @@ atlas/
 **设计**：提供 `cc_binary(name = "libatlas.so", linkshared = True)` 专用目标。
 
 **实际**：移除了该目标。原因：`cc_library` 已经产出共享库（macOS 上为 `libatlas.dylib`），`cc_binary` 与其输出路径冲突。直接使用 `bazel build //src/public:atlas` 即可获取共享库产物。
+
+---
+
+## Feature 记录
+
+| Proposal | 日期 | 简述 | 状态 |
+|----------|------|------|------|
+
+---
+
+## Bugfix 记录
+
+| BUG | 日期 | 简述 | 等级 | 状态 |
+|-----|------|------|------|------|

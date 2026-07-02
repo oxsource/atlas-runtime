@@ -139,3 +139,14 @@ docs/
   6. `phase3.md`：删除残留的旧版设计内容（第 450-785 行重复）
   7. `phase1.md`、`phase3.md`、`phase5.md`：补充 Feature/Bugfix 记录空章节
   8. 新建 `docs/proposals/README.md` 提议目录说明
+
+### 2026-07-02 文档梳理
+
+- 触发条件：经过多次开发维护后，定期回溯检查文档一致性
+- 检查项数：9
+- 发现问题：2
+- 修复问题：2
+- 遗留问题：无
+- 修复清单：
+  1. `phase6.md`：补充 Feature 记录表和 Bugfix 记录表（原文档末尾缺失）
+  2. `phase2.md`：补充 Proposal-001 的补充章节说明（Feature 记录表中已有，但补充说明缺失）
