@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <string_view>
 #include <unordered_map>
 
@@ -33,9 +34,7 @@ class SnpeBackendContext : public IBackendContext {
                           std::string>& config);
 
  private:
-#ifdef ATLAS_SNPE_ENABLED
-    bool initialized_ = false;
-#endif
+    [[maybe_unused]] bool initialized_ = false;
 };
 
 }  // namespace backend

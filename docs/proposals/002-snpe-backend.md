@@ -369,104 +369,217 @@ SNPE 使用 `.dlc`（Deep Learning Container）格式模型。可通过 SNPE SDK
 | API 兼容性 | SDK 版本需与目标设备的 SNPE 运行时版本匹配（Qualcomm 无前向兼容保证） |
 | 模型转换 | `snpe-onnx-to-dlc` 的运行需要 Linux x86_64 + Python 3.8/3.10 |
 
-### SNPE SDK 版本适配（条件编译）
+### SNPE SDK 按版本独立实现文件（替代 `#if` 条件分支）
 
-ATLAS 通过编译宏 `ATLAS_SNPE_VERSION_MAJOR` 标识 SNPE SDK 主版本，当前默认值为 `2`（对应 2.x SDK 如 2.21.0），同时可适配 `1`（对应 1.x SDK 如 1.5.0）。代码通过该宏进行条件编译处理，实现两套 API 的版本适配。
+#### 动机
 
-**版本宏机制：**
+当前 `snpe_backend.cc` 和 `snpe_backend_context.cc` 通过 `#if ATLAS_SNPE_VERSION_MAJOR` 宏在单个文件中混合 1.x 和 2.x 代码，`snpe_backend.cc` 内含 20+ 处条件编译分支。当 SNPE 3.x（或更高版本）出现时，`#if` 分支密度呈组合爆炸增长，代码可维护性急剧下降。
 
-| 宏名称 | 用途 | 取值 | 来源 |
-|--------|------|------|------|
-| `ATLAS_SNPE_ENABLED` | 控制 stub vs 完整实现（职责不变） | 定义 / 未定义 | BUILD `defines`，仅目标平台定义 |
-| `ATLAS_SNPE_VERSION_MAJOR` | 标识 SNPE SDK 主版本 | `1` 或 `2` | BUILD `defines` 默认 `2`；可通过 `--copt=-DATLAS_SNPE_VERSION_MAJOR=1` 覆盖 |
+同样，`snpe.BUILD` 用双 glob pattern 同时尝试匹配两种目录布局（例如 `aarch64-oe-linux-gcc8.2/` OR `aarch64-linux-gcc*/`），一旦新版本 SDK 调整目录结构，glob 匹配容易失效。
 
-**默认值链路：**
+**解决思路：每个 SNPE 主版本一个独立实现文件，消除文件内的版本条件编译。**
 
-1. `src/backend/snpe/BUILD` 中 `SNPE_PLATFORM` 同时定义 `ATLAS_SNPE_ENABLED=1` 和 `ATLAS_SNPE_VERSION_MAJOR=2`
-2. `snpe_backend.h` 在 `#ifdef ATLAS_SNPE_ENABLED` 块内做兜底：`#ifndef ATLAS_SNPE_VERSION_MAJOR` → `#define ATLAS_SNPE_VERSION_MAJOR 2`
-3. `.cc` 文件在完整实现路径内做合法性校验：`#if ATLAS_SNPE_VERSION_MAJOR != 1 && ATLAS_SNPE_VERSION_MAJOR != 2` → `#error`
+#### 文件拆分
 
-**切换版本的方式：**
+```
+src/backend/snpe/
+├── snpe_backend.h                # 共享头文件（不变，SnpeImpl 前向声明）
+├── snpe_backend_v1.cc            # SNPE 1.x 纯实现（零 ATLAS_SNPE_VERSION_MAJOR 分支）
+├── snpe_backend_v2.cc            # SNPE 2.x 纯实现
+├── snpe_backend_stub.cc          # 非目标平台 stub
+├── snpe_backend_context.h        # 共享头文件（不变）
+├── snpe_backend_context_v1.cc    # SNPE 1.x context 实现
+├── snpe_backend_context_v2.cc    # SNPE 2.x context 实现
+├── snpe_backend_context_stub.cc  # context stub
+└── BUILD
+```
+
+每份 `_vN.cc` 完全内聚：只 include 自己版本的 SNPE 头文件，只使用自己版本的 API，零条件编译。`SnpeImpl` 在各自 `.cc` 中独立定义（PIMPL 模式天然支持，头文件中仅前向声明）。stub 文件同理——非目标平台的空实现独立为 `_stub.cc`，不与其他版本实现混合。
+
+#### BUILD 版本选择
+
+**零 `config_setting`、零 `--define`。** 版本由 `snpe_repo.bzl` 在加载阶段自动检测，通过 `@snpe_sdk//:version.bzl` 导出，BUILD 在 `load()` 阶段直接读取。
+
+**`src/backend/snpe/BUILD`**（内联版本选择，无额外 `.bzl` 文件）：
+
+```python
+load("@snpe_sdk//:version.bzl", "SNPE_MAJOR")
+
+SNPE_PLATFORM = select({
+    "//platforms:linux_aarch64": ["ATLAS_SNPE_ENABLED=1"],
+    "//platforms:android_arm64": ["ATLAS_SNPE_ENABLED=1"],
+    "//conditions:default": [],
+})
+
+SNPE_SDK_DEP = select({
+    "//platforms:linux_aarch64": ["@snpe_sdk//:snpe"],
+    "//platforms:android_arm64": ["@snpe_sdk//:snpe"],
+    "//conditions:default": [],
+})
+
+_BACKEND_V = (
+    ["snpe_backend_v" + SNPE_MAJOR + ".cc"] if SNPE_MAJOR
+    else ["snpe_backend_stub.cc"]
+)
+_CONTEXT_V = (
+    ["snpe_backend_context_v" + SNPE_MAJOR + ".cc"] if SNPE_MAJOR
+    else ["snpe_backend_context_stub.cc"]
+)
+
+SNPE_BACKEND_SRC = select({
+    "//platforms:linux_aarch64": _BACKEND_V,
+    "//platforms:android_arm64": _BACKEND_V,
+    "//conditions:default": ["snpe_backend_stub.cc"],
+})
+
+SNPE_CONTEXT_SRC = select({
+    "//platforms:linux_aarch64": _CONTEXT_V,
+    "//platforms:android_arm64": _CONTEXT_V,
+    "//conditions:default": ["snpe_backend_context_stub.cc"],
+})
+```
+
+构建时无需任何版本参数——版本由 SDK 自身决定：
 
 ```bash
-# 默认 2.x
-bazel build --platforms=//platforms:linux_aarch64 //src/backend/snpe/...
-
-# 切换到 1.5.0
-bazel build --platforms=//platforms:linux_aarch64 \
-    --copt=-DATLAS_SNPE_VERSION_MAJOR=1 \
-    //src/backend/snpe/...
+# SDK 路径即版本声明
+export SNPE_SDK_PATH=/opt/qcom/aistack/qairt/2.21.0.240401/
+bazel build --config=linux_aarch64 //src/backend/snpe/...
 ```
 
-**SNPE 1.x vs 2.x API 差异及条件编译映射：**
+#### `@snpe_sdk` 仓库规则：模板文件 + 属性驱动
 
-| 差异点 | SNPE 1.x (1.5.0) | SNPE 2.x (2.21.0) | 条件编译方式 |
-|--------|-------------------|-------------------|-------------|
-| Runtime 枚举 | `CPU_FLOAT`, `GPU_FLOAT`, `DSP_FIXED_TF` | `CPU_FLOAT32`, `GPU_FLOAT32_16_HYBRID`, `DSP_FIXED8_TF`, `AIP_FIXED8_TF` | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
-| AIP runtime | 不支持 | `AIP_FIXED8_TF` | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
-| Performance profile 扩展 | `BALANCED` ~ `BURST` | 增加 `LOW_POWER_SAVER`, `HIGH_POWER_SAVER`, `LOW_BALANCED`, `EXTREME_POWER_SAVER` | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
-| Tensor 迭代器 | `begin()` / `end()` (non-const) | `cbegin()` / `cend()` (const) | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
-| dtype 检测 | 无 `IOBufferDataType_t`，默认 float32 | `getInputOutputBufferAttributes()` → `IOBufferDataType_t` | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
-| 日志初始化 | `SNPEFactory::initializeLogging()` 无参 | `initializeLogging(LogLevel_t::LOG_WARN)` | `ATLAS_SNPE_VERSION_MAJOR >= 2` |
-| 头文件 include 布局 | `include/zdl/SNPE/SNPE.hpp`（嵌套在 zdl/ 下） | `include/SNPE/SNPE/SNPE.hpp`（嵌套在 SNPE/ 下） | `snpe.BUILD` 的 `includes` 双路径覆盖（`include/SNPE` + `include/zdl`） |
-| `.so` 子目录名 | `aarch64-linux-gcc/`, `aarch64-android-clang/` | `aarch64-oe-linux-gcc8.2/`, `aarch64-android/` | `snpe.BUILD` glob 双模式匹配 |
+每个版本一个独立的 BUILD 模板文件，`snpe_repo.bzl` 通过 `snpe_major` 属性选择对应模板，通过 `repository_ctx.template()` 渲染到 `@snpe_sdk`。
 
-**条件编译代码模式：**
-
-```cpp
-// snpe_backend.cc（完整实现路径内）
-
-// Runtime enum selection:
-#if ATLAS_SNPE_VERSION_MAJOR >= 2
-    return static_cast<int>(DlSystem::Runtime_t::CPU_FLOAT32);
-#else
-    return static_cast<int>(DlSystem::Runtime_t::CPU_FLOAT);
-#endif
-
-// Tensor iteration:
-#if ATLAS_SNPE_VERSION_MAJOR >= 2
-    auto raw_ptr = out_itensor->cbegin();  // 2.x: const iterator
-#else
-    auto raw_ptr = out_itensor->begin();   // 1.x: non-const iterator
-#endif
-
-// Dtype detection:
-#if ATLAS_SNPE_VERSION_MAJOR >= 2
-    auto opt_attr = impl_->snpe->getInputOutputBufferAttributes(name.c_str());
-    if (opt_attr && *opt_attr != nullptr) {
-        info.dtype = SnpeDtypeToAtlas((*opt_attr)->getBufferPrecision());
-    } else {
-        info.dtype = utils::DataType::kFloat32;
-    }
-#else
-    info.dtype = utils::DataType::kFloat32;  // 1.x: no dtype introspection
-#endif
-```
-
-**`snpe.BUILD` 版本双路径覆盖：**
+**`third_party/snpe/snpe_v2.BUILD`**（SNPE 2.21.0 验证）：
 
 ```python
 cc_library(
     name = "snpe",
-    hdrs = glob(["snpe_sdk_root/include/**/*.hpp"]),
-    includes = [
-        "snpe_sdk_root/include/SNPE",     # 2.x layout
-        "snpe_sdk_root/include",          # 1.x layout (fallback)
-    ],
+    hdrs = glob(["snpe_sdk_root/include/SNPE/**/*.hpp"]),
+    includes = ["snpe_sdk_root/include/SNPE"],
     srcs = select({
-        "//platforms:linux_aarch64": glob([
-            "snpe_sdk_root/lib/aarch64-oe-linux-gcc8.2/*.so",   # 2.x
-            "snpe_sdk_root/lib/aarch64-linux-gcc/*.so",          # 1.x
+        "@//platforms:linux_aarch64": glob([
+            "snpe_sdk_root/lib/aarch64-oe-linux-gcc8.2/*.so",
         ]),
-        "//platforms:android_arm64": glob([
-            "snpe_sdk_root/lib/aarch64-android/*.so",            # 2.x
-            "snpe_sdk_root/lib/aarch64-android-clang/*.so",      # 1.x
+        "@//platforms:android_arm64": glob([
+            "snpe_sdk_root/lib/aarch64-android/*.so",
         ]),
+        "//conditions:default": [],
     }),
+    visibility = ["//visibility:public"],
 )
 ```
 
-> `glob()` 的多个 pattern 之间是 OR 关系——只要任一 pattern 匹配到文件即被包含。1.x 和 2.x 的 `.so` 子目录名不同，同时列出两个 pattern 即可覆盖两套 SDK 的目录布局。`includes` 同时列出两个 include 路径前缀，编译器按顺序查找。
+**`third_party/snpe/snpe_v1.BUILD`**（SNPE 1.50.0 验证）：
+
+```python
+cc_library(
+    name = "snpe",
+    hdrs = glob(["snpe_sdk_root/include/zdl/**/*.hpp"]),
+    includes = ["snpe_sdk_root/include/zdl"],
+    srcs = select({
+        "@//platforms:linux_aarch64": glob([
+            "snpe_sdk_root/lib/aarch64-linux-gcc4.9/*.so",
+        ]),
+        "@//platforms:android_arm64": glob([
+            "snpe_sdk_root/lib/aarch64-android-clang6.0/*.so",
+        ]),
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+)
+```
+
+**`snpe_repo.bzl`**：
+
+```python
+def _snpe_sdk_repo_impl(repository_ctx):
+    major = repository_ctx.attr.snpe_major
+    sdk_path = repository_ctx.attr.snpe_sdk_path
+    if not sdk_path:
+        sdk_path = repository_ctx.os.environ.get("SNPE_SDK_PATH", "")
+
+    if not sdk_path:
+        # No SDK available — empty repo, stub compile.
+        repository_ctx.file("BUILD.bazel", "")
+        repository_ctx.file("version.bzl", "SNPE_MAJOR = None\n")
+        return
+
+    repository_ctx.symlink(sdk_path, "snpe_sdk_root")
+
+    # Render the version-specific BUILD template.
+    repository_ctx.template(
+        "BUILD.bazel",
+        Label("//third_party/snpe:snpe_v%s.BUILD" % major),
+    )
+
+    # Export SNPE_MAJOR for src/backend/snpe/BUILD.
+    repository_ctx.file("version.bzl",
+                        'SNPE_MAJOR = "{}"\n'.format(major))
+
+snpe_sdk_repo = repository_rule(
+    implementation = _snpe_sdk_repo_impl,
+    attrs = {
+        "snpe_major": attr.string(default = "2", values = ["1", "2"]),
+        "snpe_sdk_path": attr.string(),
+    },
+    environ = ["SNPE_SDK_PATH"],
+    local = True,
+)
+```
+
+**WORKSPACE 中声明：**
+
+```python
+snpe_sdk_repo(
+    name = "snpe_sdk",
+    snpe_major = "2",           # 默认 2，可改为 "1"
+    # snpe_sdk_path = "/path",  # 可选，不设则 fallback 到 $SNPE_SDK_PATH
+)
+```
+
+> **关键特性**：版本和路径均为 WORKSPACE 属性，无需环境变量（也可通过 `$SNPE_SDK_PATH` 覆盖路径）。每个版本独立 BUILD 模板，新增版本只需添加对应模板文件。`--define` / `--config=snpe_vN` 全部消除。
+
+#### 已确认的 SDK 参考路径
+
+AI 开发时可直接引用以下路径分析 SDK 结构：
+
+| 版本 | `ATLAS_SNPE_VERSION_MAJOR` | SDK 安装路径 |
+|------|---------------------------|-------------|
+| SNPE 2.21.0.240401 | `2` | `/opt/qcom/aistack/qairt/2.21.0.240401/` |
+| SNPE 1.50.0.2622 | `1` | `/opt/qcom/sdk/snpe-1.50.0.2622/` |
+
+> 开发者负责在对应版本开发前设置正确的 `SNPE_SDK_PATH` 指向上述路径（或新版 SDK 对应路径），AI 据此分析头文件与库文件结构。
+
+#### AI 辅助分析新版本工作流
+
+当需要接入 SNPE 新主版本（如 3.x）或验证现有版本路径时，AI 按以下步骤执行：
+
+| 步骤 | 工具 | 操作 | 产出 |
+|------|------|------|------|
+| 1 | `list_files` | 递归扫描 `$SNPE_SDK_PATH/include/` | 确定头文件布局（`include/SNPE/` vs `include/zdl/` 等嵌套层次） |
+| 2 | `list_files` | 递归扫描 `$SNPE_SDK_PATH/lib/` | 确定 `.so` 子目录名（如 `aarch64-oe-linux-gcc8.2/`、`aarch64-android/` 等） |
+| 3 | `read_file` | 阅读关键头文件 | 识别 API 变化点 |
+| 3a | — | `SNPE.hpp` / `SNPEBuilder.hpp` | 构造函数、`execute()` 签名、迭代器风格（`begin` vs `cbegin`） |
+| 3b | — | `DlEnums.hpp` | Runtime 枚举（`CPU_FLOAT` vs `CPU_FLOAT32`）、PerformanceProfile 枚举新增项 |
+| 3c | — | `SNPEFactory.hpp` | `initializeLogging()` 签名、TensorFactory 接口 |
+| 3d | — | `IBufferAttributes.hpp` / `ITensor.hpp` | dtype 检测 API（`IOBufferDataType_t`）、tensor 迭代器声明 |
+| 4 | `write_to_file` | 基于分析结果编写 | `snpe_backend_v{N}.cc`、`snpe_backend_context_v{N}.cc` |
+| 5 | `write_to_file` | 基于目录结构编写 | `snpe_v{N}.BUILD`（模板文件） |
+| 6 | `replace_in_file` | 更新 `snpe_repo.bzl` | `values` 列表新增 `"N"` |
+
+#### 迁移路径
+
+从当前单文件 `#if ATLAS_SNPE_VERSION_MAJOR` 模式迁移到按版本拆分：
+
+1. 从 `snpe_backend.cc` 中提取 `#ifdef ATLAS_SNPE_ENABLED` 块内 1.x 路径代码 → 写入 `snpe_backend_v1.cc`
+2. 从 `snpe_backend.cc` 中提取 `#ifdef ATLAS_SNPE_ENABLED` 块内 2.x 路径代码 → 写入 `snpe_backend_v2.cc`（默认版本）
+3. 从 `snpe_backend.cc` 中提取 `#else` stub 代码 → 写入 `snpe_backend_stub.cc`
+4. 对 `snpe_backend_context.cc` 重复上述拆分
+5. 各 `_vN.cc` / `_stub.cc` 文件内不再出现 `ATLAS_SNPE_VERSION_MAJOR` 相关条件编译
+6. 在 BUILD 中添加 `config_setting` + `select()`，移除 `defines` 中的 `ATLAS_SNPE_VERSION_MAJOR=1`
+7. 拆分 `snpe.BUILD` 为 `snpe_v1.BUILD` / `snpe_v2.BUILD`
 
 ## 三、影响范围
 
@@ -474,7 +587,7 @@ cc_library(
 |------|------|
 | 清单格式 | 无变更（`backend: "snpe"` 已被现有解析器支持） |
 | 公共 API | 无变更（`ModelHandle::Run` 接口不变） |
-| 内部模块 | 新增 `src/backend/snpe/`，不修改现有模块 |
+| 内部模块 | 新增 `src/backend/snpe/`；`snpe_backend.cc` / `snpe_backend_context.cc` 拆分为 per-version `_v{N}.cc` + `_stub.cc` |
 | 新增依赖 | SNPE SDK（闭源，local_repository 引入） |
 | 平台支持 | Linux aarch64（嵌入式 Linux）+ Android arm64（Snapdragon 移动设备）；macOS / Linux x86_64 编译为 stub no-op |
 | 公共库 | `//src/public:atlas` deps 增加条件依赖 |
@@ -619,3 +732,68 @@ cc_library(
 SNPE `.dlc` 模型转换过程中可能内嵌标准化（mean/std）预处理。若清单中同时配置 `normalize` 字段，Pipeline 将自动插入 `NormalizeNode`，导致双重归一化。
 
 **约定**：约束层面解决——清单中配置 SNPE 后端的模型条目不应声明 `normalize` 字段。此约束记录于 `docs/phase4.md`（阶段四实现文档），不通过代码强制校验。
+---
+
+> **【补充】** 2026-07-02 | v1 / v2 交叉编译实测结果，记录调试经验。
+
+## 六、实测调试记录
+
+### 6.1 验证环境
+
+| 组件 | 信息 |
+|------|------|
+| NDK | r25b |
+| Host | Linux x86_64 |
+| 目标 | `--config=android_arm64` (ARM aarch64, API 24) |
+
+### 6.2 通用问题（v1 & v2 共同）
+
+#### 6.2.1 `SnpeImpl` 必须定义为嵌套类型
+
+**现象**：`member access into incomplete type 'atlas::backend::SnpeBackend::SnpeImpl'`
+
+**根因**：头文件 `snpe_backend.h` 中 `struct SnpeImpl;` 是 `SnpeBackend` 的嵌套前向声明。`.cc` 中以 `struct SnpeImpl { ... };` 定义的是另一个独立类型。
+
+**修复**：所有实现文件中定义为 `struct SnpeBackend::SnpeImpl { ... };`。
+
+#### 6.2.2 `Optional<T>::operator->()` 不存在
+
+**现象**：`member reference type 'TensorShape' is not a pointer`
+
+**根因**：v1 (1.50.0) 和 v2 (2.21.0) 的 `DlOptional<T>` 均不提供 `operator->()`，只提供 `operator*()` 和 `operator bool()`。
+
+**修复**：`opt_shape->getDimensions()` → `(*opt_shape).getDimensions()`。
+
+#### 6.2.3 `IOBufferDataType_t` 不存在
+
+**现象**：`no member named 'IOBufferDataType_t' in namespace ...`
+
+**根因**：v1 和 v2 均不包含 `IOBufferDataType_t` 类型。
+
+**修复**：移除 `SnpeDtypeToAtlas()` / `SnpeElementByteSize()`，dtype 默认 `kFloat32`。
+
+### 6.3 SNPE 1.50.0 专属问题
+
+| 问题 | 现象 | 根因 | 修复 |
+|------|------|------|------|
+| 命名空间别名冲突 | `redefinition of 'DlSystem'` | 1.x SDK 中 `DlSystem` / `DlContainer` 已在全局作用域定义 | 使用 `zdl::SNPE::` / `zdl::DlSystem::` 全限定名 |
+| 无日志 API | `no member 'terminateLogging'` | 1.50.0 的 `SNPEFactory` 无 `initializeLogging()` / `terminateLogging()` | `snpe_backend_context_v1.cc` 移除日志调用 |
+| 无 `EXTREME_POWER_SAVER` | 枚举值不存在 | 1.50.0 的 `PerformanceProfile_t` 最大为 `LOW_BALANCED = 8` | 移除 `kPerfExtremePowerSaver` 常量及分支 |
+
+### 6.4 SNPE 2.21.0 专属问题
+
+| 问题 | 现象 | 根因 | 修复 |
+|------|------|------|------|
+| `.h` 头文件缺失 | `fatal error: 'DlSystem/DlError.h' file not found` | 2.21.0 同时有 `.h` 和 `.hpp` 头文件，`Wrapper.hpp` 引用 `.h` | `snpe_v2.BUILD` 的 `hdrs` 同时 glob `**/*.hpp` 和 `**/*.h` |
+
+### 6.5 验证流程
+
+新增版本或切换 SDK 时，按以下步骤验收：
+
+| 步骤 | 检查项 | 预期结果 |
+|------|--------|---------|
+| 1 | `cat $(bazel info output_base)/external/snpe_sdk/version.bzl` | `SNPE_MAJOR = "1"` 或 `"2"` |
+| 2 | `cat $(bazel info output_base)/external/snpe_sdk/BUILD.bazel \| head -3` | 对应版本模板注释头 |
+| 3 | `bazel query 'deps(//src/backend/snpe:snpe_backend)' --output=build \| grep snpe_backend_v` | `android_arm64` 选中 `snpe_backend_v{N}.cc` |
+| 4 | 交叉编译 `--config=android_arm64` | 零错误 |
+| 5 | `file bazel-bin/.../libsnpe_backend.so` | `ELF 64-bit LSB shared object, ARM aarch64` |

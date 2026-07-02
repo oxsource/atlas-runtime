@@ -14,22 +14,14 @@ namespace backend {
 
 class SnpeBackendContext;
 
-#ifdef ATLAS_SNPE_ENABLED
-
-// SNPE SDK major version guard — defaults to 2 if not specified at build time.
-#ifndef ATLAS_SNPE_VERSION_MAJOR
-#define ATLAS_SNPE_VERSION_MAJOR 2
-#endif
-
-// Opaque implementation struct holding SNPE SDK resources.
-// Defined in snpe_backend.cc to avoid leaking SNPE headers.
-struct SnpeImpl;
-#endif
-
 // SNPE inference backend — loads .dlc models and runs inference
 // on Qualcomm DSP / GPU / AIP.
 //
 // Register via ATLAS_REGISTER_BACKEND("snpe", SnpeBackend).
+//
+// On target platforms (Linux aarch64 / Android arm64) with SNPE SDK available,
+// SnpeImpl holds the full SNPE network handle and builder resources.
+// On non-target platforms (stub), SnpeImpl is an empty dummy struct.
 class SnpeBackend : public IBackend {
  public:
     SnpeBackend();
@@ -62,9 +54,11 @@ class SnpeBackend : public IBackend {
 
     bool loaded_ = false;
 
-#ifdef ATLAS_SNPE_ENABLED
+    // Opaque implementation struct:
+    //   - v1.cc / v2.cc: defined with SNPE SDK types
+    //   - stub.cc: defined as empty dummy struct
+    struct SnpeImpl;
     std::unique_ptr<SnpeImpl> impl_;
-#endif
 };
 
 }  // namespace backend
