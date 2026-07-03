@@ -11,6 +11,7 @@ cc_library(
     hdrs = ["manifest_parser.h"],
     deps = [
         ":manifest_config",
+        "//src/utils:logger",
         "//src/utils:types",
         "@nlohmann_json//:json",
     ],
@@ -27,6 +28,7 @@ cc_library(
         "//src/backend/base:i_backend",
         "//src/backend/base:i_backend_context",
         "//src/pipeline:pipeline",
+        "//src/utils:logger",
         "//src/utils:types",
     ],
     visibility = ["//visibility:public"],

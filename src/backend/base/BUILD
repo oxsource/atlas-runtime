@@ -22,6 +22,7 @@ cc_library(
     deps = [
         ":i_backend",
         ":i_backend_context",
+        "//src/utils:logger",
     ],
     visibility = ["//visibility:public"],
 )

@@ -8,6 +8,9 @@
 #include "src/core/manifest_config.h"
 #include "src/utils/types.h"
 
+#define LOG_TAG "Atlas::SnpeBE_Stub"
+#include "src/utils/logger.h"
+
 namespace atlas {
 namespace backend {
 
@@ -28,6 +31,7 @@ SnpeBackend::~SnpeBackend() {
 utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
                                     const core::ModelConfig& config,
                                     IBackendContext* ctx) {
+    ATLAS_LOGD("SNPE stub: Load(%s) -> kBackendNotFound", model_path.c_str());
     (void)model_path;
     (void)config;
     (void)ctx;
@@ -36,6 +40,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
 
 utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
                                      std::vector<utils::Tensor>& outputs) {
+    ATLAS_LOGD("SNPE stub: Infer(%zu inputs) -> kNotInitialized", inputs.size());
     (void)inputs;
     (void)outputs;
     return utils::ErrorCode::kNotInitialized;
@@ -50,6 +55,7 @@ std::vector<utils::TensorInfo> SnpeBackend::GetOutputInfo() const {
 }
 
 void SnpeBackend::Unload() {
+    ATLAS_LOGD("SNPE stub: Unload");
     active_ctx_ = nullptr;
     loaded_ = false;
 }

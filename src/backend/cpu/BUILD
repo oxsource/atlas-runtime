@@ -25,6 +25,7 @@ cc_library(
         ":cpu_backend_context",
         "//src/backend/base:backend_factory",
         "//src/backend/base:i_backend",
+        "//src/utils:logger",
         "//src/utils:types",
     ] + select({
         "//platforms:macos_arm64":    ["@onnxruntime_macos_arm64//:onnxruntime"],

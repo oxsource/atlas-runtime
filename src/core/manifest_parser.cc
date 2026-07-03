@@ -13,6 +13,9 @@
 #include "src/core/manifest_config.h"
 #include "src/utils/types.h"
 
+#define LOG_TAG "Atlas::ManifestParser"
+#include "src/utils/logger.h"
+
 namespace atlas {
 namespace core {
 
@@ -295,24 +298,31 @@ utils::ErrorCode ParseModelConfig(const nlohmann::json& j,
 
 utils::ErrorCode ManifestParser::Parse(const std::string& path,
                                         ManifestConfig* config) const {
+    ATLAS_LOGD("parsing manifest: %s", path.c_str());
+
     if (config == nullptr) {
+        ATLAS_LOGE("config is nullptr");
         return utils::ErrorCode::kInvalidArgument;
     }
 
     std::ifstream file(path);
     if (!file.is_open()) {
+        ATLAS_LOGE("failed to open file: %s", path.c_str());
         return utils::ErrorCode::kFileNotFound;
     }
+    ATLAS_LOGD("file opened, parsing JSON");
 
     nlohmann::json j;
     try {
         file >> j;
     } catch (const nlohmann::json::parse_error&) {
+        ATLAS_LOGE("JSON parse error in: %s", path.c_str());
         return utils::ErrorCode::kParseError;
     }
 
     // Validate and parse version.
     if (!j.contains(kKeyVersion) || !j[kKeyVersion].is_string()) {
+        ATLAS_LOGE("missing or invalid 'version' field");
         return utils::ErrorCode::kParseError;
     }
     config->version = j[kKeyVersion].get<std::string>();
@@ -320,21 +330,28 @@ utils::ErrorCode ManifestParser::Parse(const std::string& path,
     int major = 0;
     int minor = 0;
     if (!ParseVersionString(config->version, &major, &minor)) {
+        ATLAS_LOGE("malformed version string: %s", config->version.c_str());
         return utils::ErrorCode::kParseError;
     }
     if (major != kSupportedMajorVersion) {
+        ATLAS_LOGE("version mismatch: got %d.%d, supported major %d",
+                   major, minor, kSupportedMajorVersion);
         return utils::ErrorCode::kVersionMismatch;
     }
+    ATLAS_LOGD("manifest version: %d.%d", major, minor);
 
     // Validate and parse name.
     if (!j.contains(kKeyName) || !j[kKeyName].is_string()) {
+        ATLAS_LOGE("missing or invalid 'name' field");
         return utils::ErrorCode::kParseError;
     }
     config->name = j[kKeyName].get<std::string>();
+    ATLAS_LOGD("manifest name: %s", config->name.c_str());
 
     // Validate models array is present and non-empty.
     if (!j.contains(kKeyModels) || !j[kKeyModels].is_array() ||
         j[kKeyModels].empty()) {
+        ATLAS_LOGE("missing or empty 'models' array");
         return utils::ErrorCode::kInvalidArgument;
     }
 
@@ -343,7 +360,15 @@ utils::ErrorCode ManifestParser::Parse(const std::string& path,
     for (const auto& model_json : j[kKeyModels]) {
         ModelConfig model;
         auto ret = ParseModelConfig(model_json, idx, &model);
-        if (ret != utils::ErrorCode::kOk) return ret;
+        if (ret != utils::ErrorCode::kOk) {
+            ATLAS_LOGE("failed to parse model entry at index %d (error=%d)",
+                       idx, static_cast<int>(ret));
+            return ret;
+        }
+        ATLAS_LOGD("model[%d]: id=%s, backend=%s, path=%s, inputs=%zu, outputs=%zu",
+                   idx, model.id.c_str(), model.backend.c_str(),
+                   model.model_path.c_str(),
+                   model.inputs.size(), model.outputs.size());
         config->models.push_back(std::move(model));
         ++idx;
     }
@@ -352,10 +377,13 @@ utils::ErrorCode ManifestParser::Parse(const std::string& path,
     std::unordered_set<std::string> seen_ids;
     for (const auto& model : config->models) {
         if (!seen_ids.insert(model.id).second) {
+            ATLAS_LOGE("duplicate model id: %s", model.id.c_str());
             return utils::ErrorCode::kInvalidArgument;
         }
     }
 
+    ATLAS_LOGD("parse complete: %zu model(s) loaded from '%s'",
+               config->models.size(), config->name.c_str());
     return utils::ErrorCode::kOk;
 }
 

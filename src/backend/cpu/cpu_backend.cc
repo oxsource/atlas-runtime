@@ -9,6 +9,9 @@
 #include "src/backend/cpu/cpu_backend_context.h"
 #include "src/utils/types.h"
 
+#define LOG_TAG "Atlas::CpuBackend"
+#include "src/utils/logger.h"
+
 namespace atlas {
 namespace backend {
 
@@ -46,6 +49,11 @@ CpuBackend::~CpuBackend() { Unload(); }
 utils::ErrorCode CpuBackend::Load(const std::string& model_path,
                                    const core::ModelConfig& config,
                                    IBackendContext* ctx) {
+    ATLAS_LOGD("Load called: model_path=%s, num_threads_cfg=%s",
+               model_path.c_str(),
+               config.config.count(kConfigNumThreads) ?
+               config.config.at(kConfigNumThreads).c_str() : "default");
+
     Unload();
 
     // Resolve num_threads from per-model config, fall back to default.
@@ -58,13 +66,16 @@ utils::ErrorCode CpuBackend::Load(const std::string& model_path,
             num_threads = kDefaultNumThreads;
         }
     }
+    ATLAS_LOGD("num_threads=%d", num_threads);
 
     try {
         if (ctx != nullptr) {
             // Borrow the shared Env from the provided context.
+            ATLAS_LOGD("using shared CpuBackendContext");
             active_env_ = &static_cast<CpuBackendContext*>(ctx)->GetEnv();
         } else {
             // Fallback: create a private Env (standalone / test usage).
+            ATLAS_LOGD("no shared context, creating private Ort::Env");
             own_env_    = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING,
                                                       kOrtLoggerName);
             active_env_ = own_env_.get();
@@ -75,10 +86,12 @@ utils::ErrorCode CpuBackend::Load(const std::string& model_path,
         opts.SetGraphOptimizationLevel(
             GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 
+        ATLAS_LOGD("creating ORT session: %s", model_path.c_str());
         session_ = std::make_unique<Ort::Session>(*active_env_,
                                                    model_path.c_str(),
                                                    opts);
-    } catch (const Ort::Exception&) {
+    } catch (const Ort::Exception& e) {
+        ATLAS_LOGE("ORT exception during Load: %s", e.what());
         own_env_.reset();
         active_env_ = nullptr;
         session_.reset();
@@ -87,17 +100,24 @@ utils::ErrorCode CpuBackend::Load(const std::string& model_path,
 
     auto ret = BuildTensorInfos();
     if (ret != utils::ErrorCode::kOk) {
+        ATLAS_LOGE("BuildTensorInfos failed (error=%d)", static_cast<int>(ret));
         Unload();
         return ret;
     }
 
     loaded_ = true;
+    ATLAS_LOGD("Load success: %zu inputs, %zu outputs",
+               input_info_.size(), output_info_.size());
     return utils::ErrorCode::kOk;
 }
 
 utils::ErrorCode CpuBackend::Infer(const std::vector<utils::Tensor>& inputs,
                                     std::vector<utils::Tensor>& outputs) {
-    if (!loaded_) return utils::ErrorCode::kNotInitialized;
+    ATLAS_LOGD("Infer called: %zu inputs", inputs.size());
+    if (!loaded_) {
+        ATLAS_LOGE("Infer called before Load");
+        return utils::ErrorCode::kNotInitialized;
+    }
 
     // Wrap atlas Tensors as Ort::Value (zero-copy).
     auto mem_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator,
@@ -165,7 +185,8 @@ utils::ErrorCode CpuBackend::Infer(const std::vector<utils::Tensor>& inputs,
                                     in_names.size(),
                                     out_names.data(),
                                     out_names.size());
-    } catch (const Ort::Exception&) {
+    } catch (const Ort::Exception& e) {
+        ATLAS_LOGE("ORT exception during Infer: %s", e.what());
         return utils::ErrorCode::kInferFailed;
     }
 
@@ -202,6 +223,7 @@ std::vector<utils::TensorInfo> CpuBackend::GetOutputInfo() const {
 }
 
 void CpuBackend::Unload() {
+    ATLAS_LOGD("Unload called");
     session_.reset();
     own_env_.reset();
     active_env_ = nullptr;
@@ -231,8 +253,10 @@ utils::DataType CpuBackend::OrtDtypeToAtlas(
 }
 
 utils::ErrorCode CpuBackend::BuildTensorInfos() {
+    ATLAS_LOGD("BuildTensorInfos called");
     const size_t num_inputs  = session_->GetInputCount();
     const size_t num_outputs = session_->GetOutputCount();
+    ATLAS_LOGD("model has %zu inputs, %zu outputs", num_inputs, num_outputs);
 
     input_names_.reserve(num_inputs);
     input_info_.reserve(num_inputs);
@@ -249,6 +273,9 @@ utils::ErrorCode CpuBackend::BuildTensorInfos() {
         info.name  = input_names_.back();
         info.dtype = OrtDtypeToAtlas(ort_dtype);
         for (int64_t d : ort_shape) info.shape.push_back(static_cast<int>(d));
+        ATLAS_LOGD("input[%zu]: name=%s, dtype=%d, rank=%zu",
+                   i, info.name.c_str(), static_cast<int>(info.dtype),
+                   info.shape.size());
         input_info_.push_back(std::move(info));
     }
 
@@ -267,6 +294,9 @@ utils::ErrorCode CpuBackend::BuildTensorInfos() {
         info.name  = output_names_.back();
         info.dtype = OrtDtypeToAtlas(ort_dtype);
         for (int64_t d : ort_shape) info.shape.push_back(static_cast<int>(d));
+        ATLAS_LOGD("output[%zu]: name=%s, dtype=%d, rank=%zu",
+                   i, info.name.c_str(), static_cast<int>(info.dtype),
+                   info.shape.size());
         output_info_.push_back(std::move(info));
     }
 
