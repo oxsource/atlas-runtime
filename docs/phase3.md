@@ -1,8 +1,8 @@
 # 阶段三实现方案：ModelManager + Atlas API + 单元测试
 
-> **文档版本**：1.0.0
+> **文档版本**：1.0.1
 > **对应代码版本**：v1.0.0
-> **最后更新**：2026-06-26
+> **最后更新**：2026-07-03
 > **状态**：已实现
 
 ## 一、目标与交付物
@@ -455,6 +455,7 @@ tests/
 |----------|------|------|------|
 | [Proposal-006](proposals/006-model-config-public-api.md) | 2026-06-30 | ModelHandle 暴露 ModelConfig 关键字段 | 已采纳 |
 | [Proposal-007](proposals/007-third-party-dir-restructuring.md) | 2026-06-30 | 三方库目录按类型分文件夹管理 | 已采纳 |
+| [Proposal-008](proposals/008-logger-implementation.md) | 2026-07-03 | 日志输出管理系统 | 已采纳 |
 ---
 
 ## Bugfix 记录
@@ -468,3 +469,5 @@ tests/
 > **【补充】** Proposal-006 | 2026-06-30 | ModelHandle 新增 GetBackend() / GetModelPath() / GetLoadStrategy() / GetConfig() 四个只读查询方法。详细设计见 docs/proposals/006-model-config-public-api.md。
 
 > **【补充】** Proposal-007 | 2026-06-30 | third_party/ 按第三方库类型分目录管理（nlohmann_json/、onnxruntime/、snpe/），atlas_deps.bzl 同步更新 build_file Label。详细设计见 docs/proposals/007-third-party-dir-restructuring.md。
+
+> **【补充】** Proposal-008 | 2026-07-03 | 文档版本 1.0.0 → 1.0.1。新增轻量级日志输出管理系统（src/utils/logger.h/cc），提供 ATLAS_LOGD/I/W/E 宏 + Logger 类双接口，支持跨平台自适应输出，零外部依赖。详细设计见 docs/proposals/008-logger-implementation.md。

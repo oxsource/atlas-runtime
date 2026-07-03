@@ -26,3 +26,4 @@ NNN-short-kebab-title.md
 | [005](005-release-script-and-makefile-test.md) | 脚本编译输出与 Makefile 集成测试 | 已采纳 |
 | [006](006-model-config-public-api.md) | ModelHandle 暴露 ModelConfig 关键字段 | 已采纳 |
 | [007](007-third-party-dir-restructuring.md) | 三方库目录按类型分文件夹管理 | 已采纳 |
+| [008](008-logger-implementation.md) | 日志输出管理系统 | 已采纳 |

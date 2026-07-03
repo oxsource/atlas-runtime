@@ -192,7 +192,7 @@ atlas/
 │   │   ├── snpe/           # SNPE/QNN 后端（高通）
 │   │   └── rknn/           # RKNN 后端（瑞芯微）
 │   ├── pipeline/           # 预处理 / 后处理管线
-│   └── utils/              # 日志、错误码、类型定义、Tensor
+│   └── utils/              # 日志（已实现）、错误码、类型定义、Tensor
 ├── tests/                  # 单元测试 + 集成测试
 ├── examples/               # 示例应用
 ├── third_party/            # 第三方依赖（yaml-cpp 等）

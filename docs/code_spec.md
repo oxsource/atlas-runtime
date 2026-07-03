@@ -152,6 +152,22 @@ struct TensorInfo {};
 - 函数内部通过返回值或输出参数传递错误状态；
 - 必要时使用日志宏记录错误上下文，但不在库代码中直接调用 `std::cerr`。
 
+日志宏使用示例（详见 `src/utils/logger.h`）：
+
+```cpp
+#define LOG_TAG "Atlas::MyModule"
+#include "src/utils/logger.h"
+
+// 开发调试
+ATLAS_LOGD("Processing tensor, shape[0]=%zu", shape.size());
+// 常规信息
+ATLAS_LOGI("Model loaded: %s", model_path.c_str());
+// 警告
+ATLAS_LOGW("Performance degradation detected: %d ms", latency);
+// 错误
+ATLAS_LOGE("Failed to load model: %s, error=%d", path.c_str(), err_code);
+```
+
 ```cpp
 // 正确
 atlas::utils::ErrorCode ManifestParser::Parse(
