@@ -103,9 +103,29 @@ if [[ "${PLATFORM}" == macos_* ]] || { [[ -z "${PLATFORM}" ]] && [[ "$(uname -s)
 fi
 
 # ONNX Runtime
-ORT_LIB=$(find "$(bazel info output_base 2>/dev/null || echo /private/var/tmp/_bazel_moks)" \
-    -name "libonnxruntime*${LIB_EXT}" -type f 2>/dev/null | head -1)
-if [[ -n "${ORT_LIB}" ]]; then
+# Map platform to the correct external repository name (must match atlas_deps.bzl).
+if [[ "${PLATFORM}" == macos_* ]]; then
+    ORT_REPO="onnxruntime_macos_arm64"
+elif [[ "${PLATFORM}" == linux_aarch64 ]]; then
+    ORT_REPO="onnxruntime_linux_aarch64"
+elif [[ "${PLATFORM}" == android_arm64 ]]; then
+    ORT_REPO="onnxruntime_android_arm64"
+elif [[ "${PLATFORM}" == android_x86_64 ]]; then
+    ORT_REPO="onnxruntime_android_x86_64"
+else
+    ORT_REPO="onnxruntime_linux_x86_64"
+fi
+
+ORT_EXT_DIR="$(bazel info output_base 2>/dev/null || echo /private/var/tmp/_bazel_moks)/external/${ORT_REPO}"
+# Android AAR contains multiple ABIs; use exact path instead of find.
+if [[ "${PLATFORM}" == android_arm64 ]]; then
+    ORT_LIB="${ORT_EXT_DIR}/jni/arm64-v8a/libonnxruntime${LIB_EXT}"
+elif [[ "${PLATFORM}" == android_x86_64 ]]; then
+    ORT_LIB="${ORT_EXT_DIR}/jni/x86_64/libonnxruntime${LIB_EXT}"
+else
+    ORT_LIB=$(find "${ORT_EXT_DIR}" -name "libonnxruntime${LIB_EXT}" -type f 2>/dev/null | head -1)
+fi
+if [[ -n "${ORT_LIB}" && -f "${ORT_LIB}" ]]; then
     cp "${ORT_LIB}" "${OUTPUT_DIR}/lib/"
 fi
 
