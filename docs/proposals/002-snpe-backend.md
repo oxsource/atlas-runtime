@@ -813,7 +813,9 @@ source /opt/qcom/aistack/qairt/2.21.0.240401/bin/envsetup.sh
 # 方式二：手动设置
 # export SNPE_ROOT=/opt/qcom/aistack/qairt/2.21.0.240401
 
-# --- SNPE 1.x（无 envsetup.sh，需手动设置） ---
+# --- SNPE 1.x ---
+# 部分安装包可能存在 envsetup.sh 不可读/不可执行（权限受限）情况，
+# 建议直接使用手动变量方式（见 7.3 命令模板）。
 # export SNPE_ROOT=/opt/qcom/sdk/snpe-1.50.0.2622
 
 export SNPE_SDK_PATH=$SNPE_ROOT
@@ -847,3 +849,45 @@ uv pip install packaging
 ```
 
 > `.venv/`、`.venv36`、`.venv38` 均已加入 `.gitignore`，不会被提交到版本控制。
+
+### 7.3 SNPE 1.x（1.50.0）验证命令（已实测）
+
+以下命令用于 Linux x86_64 主机验证 V1 端到端链路（构建 + 推理）：
+
+```bash
+# 0) 工作区使用 SNPE v1
+grep -n "snpe_major" WORKSPACE
+# 预期: snpe_major = "1"
+
+# 1) 构建示例
+bazel build //examples/snpe_cpu:snpe_cpu
+
+# 2) 运行示例（使用 V1 生成的 DLC）
+export SAMPLE_MODEL_DIR=/tmp/snpe_sample_models_v1
+./bazel-bin/examples/snpe_cpu/snpe_cpu examples/snpe_cpu/manifest.json
+```
+
+若需要在本机重新生成 V1 的 DLC（SNPE 1.50.0 转换器依赖 Python 3.6）：
+
+```bash
+# 3) 准备 Python 3.6 环境（一次性）
+conda create -y -n snpe36 python=3.6
+conda run -n snpe36 pip install onnx==1.10.2
+
+# 4) 在 snpe36 环境中转换模型
+conda run -n snpe36 bash -lc '
+    export SNPE_ROOT=/opt/qcom/sdk/snpe-1.50.0.2622
+    export SNPE_SDK_PATH=$SNPE_ROOT
+    export PYTHONPATH=$SNPE_ROOT/lib/python
+    export LD_LIBRARY_PATH=$SNPE_ROOT/lib/x86_64-linux-clang:$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+
+    python examples/snpe_cpu/gen_models.py /tmp/snpe_sample_models_v1
+'
+```
+
+常见问题：
+
+- `libpython3.6m.so.1.0: not found`
+    - 说明转换器运行在非 Python 3.6 环境；使用 `conda run -n snpe36 ...` 并补齐 `LD_LIBRARY_PATH=$CONDA_PREFIX/lib`。
+- `libQnnHtp.so => not found`
+    - 说明主机链接/运行时库集合不匹配；V1 x86_64 主机侧仅链接 `libSNPE.so` 可避免该依赖链路。

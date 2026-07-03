@@ -4,9 +4,9 @@
   "models": [
     {
       "id": "snpe_identity",
-      "name": "SNPE Identity Model (CPU Runtime)",
+      "name": "SNPE ReLU Model (CPU Runtime)",
       "backend": "snpe",
-      "model_path": "${SAMPLE_MODEL_DIR}/identity_snpe.dlc",
+      "model_path": "${SAMPLE_MODEL_DIR}/relu_snpe.dlc",
       "load_strategy": "eager",
       "inputs": [
         {

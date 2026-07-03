@@ -28,5 +28,5 @@ atlas_android_setup()
 load("//third_party/snpe:snpe_repo.bzl", "snpe_sdk_repo")
 snpe_sdk_repo(
     name = "snpe_sdk",
-    snpe_major = "2",
+    snpe_major = "1",
 )

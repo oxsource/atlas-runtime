@@ -1,12 +1,18 @@
-"""Generates an identity .dlc model for the SNPE CPU runtime demo.
+"""Generates a ReLU .dlc model for the SNPE CPU runtime demo.
 
 Prerequisites:
   - SNPE SDK installed (SNPE_SDK_PATH environment variable)
   - Python 3.8+ with onnx available
 
 Workflow:
-  1. Generate an ONNX identity model (1x3x4x4 float32)
+  1. Generate an ONNX ReLU model (1x3x4x4 float32)
   2. Convert ONNX -> .dlc via snpe-onnx-to-dlc
+
+Note: ReLU is used instead of Identity because SNPE v1 (1.50.0)
+snpe-onnx-to-dlc does not support the Identity operator. ReLU is
+a minimal single-input/single-output operator supported by all
+SNPE converter versions. For test inputs (all >= 0), ReLU is
+functionally equivalent to Identity.
 
 Usage:
   python3 examples/snpe_cpu/gen_models.py <output_dir>
@@ -24,10 +30,10 @@ import onnx
 from onnx import TensorProto, helper
 
 
-def make_identity_onnx(out_path: str) -> None:
-    """Generate an ONNX Identity model: 1x3x4x4 float32."""
+def make_relu_onnx(out_path: str) -> None:
+    """Generate an ONNX ReLU model: 1x3x4x4 float32."""
     shape = [1, 3, 4, 4]
-    node = helper.make_node("Identity",
+    node = helper.make_node("Relu",
                              inputs=["images"],
                              outputs=["output"])
     input_vi = helper.make_tensor_value_info(
@@ -35,7 +41,7 @@ def make_identity_onnx(out_path: str) -> None:
     output_vi = helper.make_tensor_value_info(
         "output", TensorProto.FLOAT, shape)
     graph = helper.make_graph(
-        [node], "identity_graph", [input_vi], [output_vi])
+        [node], "relu_graph", [input_vi], [output_vi])
     model = helper.make_model(
         graph,
         opset_imports=[helper.make_opsetid("", 11)],
@@ -73,10 +79,10 @@ if __name__ == "__main__":
     out_dir = sys.argv[1] if len(sys.argv) > 1 else "/tmp/snpe_sample_models"
     os.makedirs(out_dir, exist_ok=True)
 
-    onnx_path = os.path.join(out_dir, "identity_snpe.onnx")
-    dlc_path = os.path.join(out_dir, "identity_snpe.dlc")
+    onnx_path = os.path.join(out_dir, "relu_snpe.onnx")
+    dlc_path = os.path.join(out_dir, "relu_snpe.dlc")
 
-    make_identity_onnx(onnx_path)
+    make_relu_onnx(onnx_path)
     onnx_to_dlc(onnx_path, dlc_path)
 
     print(f"Done. Set SAMPLE_MODEL_DIR={out_dir}")
