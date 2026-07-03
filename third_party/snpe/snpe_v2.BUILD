@@ -14,13 +14,13 @@ cc_library(
     includes = ["snpe_sdk_root/include/SNPE"],
     srcs = select({
         "@//platforms:linux_aarch64": glob([
-            "snpe_sdk_root/lib/aarch64-oe-linux-gcc8.2/*.so",
+            "snpe_sdk_root/lib/aarch64-oe-linux-gcc8.2/libSNPE.so",
         ]),
         "@//platforms:linux_x86_64": glob([
-            "snpe_sdk_root/lib/x86_64-linux-clang/*.so",
+            "snpe_sdk_root/lib/x86_64-linux-clang/libSNPE.so",
         ]),
         "@//platforms:android_arm64": glob([
-            "snpe_sdk_root/lib/aarch64-android/*.so",
+            "snpe_sdk_root/lib/aarch64-android/libSNPE.so",
         ]),
         "//conditions:default": [],
     }),
