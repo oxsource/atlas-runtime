@@ -25,6 +25,9 @@
 #include "src/backend/snpe/snpe_backend_context.h"
 #include "src/utils/types.h"
 
+#define LOG_TAG "Atlas::SnpeBE_V1"
+#include "src/utils/logger.h"
+
 namespace atlas {
 namespace backend {
 
@@ -198,13 +201,17 @@ SnpeBackend::~SnpeBackend() { Unload(); }
 utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
                                     const core::ModelConfig& config,
                                     IBackendContext* ctx) {
+    ATLAS_LOGD("%s called, model_path=%s", __FUNCTION__, model_path.c_str());
     Unload();
 
     // 1. Ensure shared context is initialized (idempotent).
     if (ctx != nullptr) {
         active_ctx_ = static_cast<SnpeBackendContext*>(ctx);
         auto ret = active_ctx_->Init(config.config);
-        if (ret != utils::ErrorCode::kOk) return ret;
+        if (ret != utils::ErrorCode::kOk) {
+            ATLAS_LOGE("SnpeBackendContext::Init failed (error=%d)", static_cast<int>(ret));
+            return ret;
+        }
     }
 
     // 2. Extract per-model parameters from config.
@@ -238,6 +245,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
     // 3. Open the .dlc container.
     impl_->container = zdl::DlContainer::IDlContainer::open(model_path);
     if (impl_->container == nullptr) {
+        ATLAS_LOGE("Failed to open DLC container: %s", model_path.c_str());
         Unload();
         return utils::ErrorCode::kFileNotFound;
     }
@@ -256,6 +264,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
 
     impl_->snpe = builder.build();
     if (impl_->snpe == nullptr) {
+        ATLAS_LOGE("SNPE builder.build() failed for model: %s", model_path.c_str());
         Unload();
         return utils::ErrorCode::kInferFailed;
     }
@@ -264,6 +273,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
     {
         auto opt_in_names = impl_->snpe->getInputTensorNames();
         if (!opt_in_names) {
+            ATLAS_LOGE("Failed to get input tensor names from SNPE model");
             Unload();
             return utils::ErrorCode::kInferFailed;
         }
@@ -276,6 +286,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
     {
         auto opt_out_names = impl_->snpe->getOutputTensorNames();
         if (!opt_out_names) {
+            ATLAS_LOGE("Failed to get output tensor names from SNPE model");
             Unload();
             return utils::ErrorCode::kInferFailed;
         }
@@ -289,6 +300,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
     // 6. Build tensor info.
     auto ret = BuildTensorInfos();
     if (ret != utils::ErrorCode::kOk) {
+        ATLAS_LOGE("BuildTensorInfos failed (error=%d)", static_cast<int>(ret));
         Unload();
         return ret;
     }
@@ -299,8 +311,14 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
 
 utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
                                      std::vector<utils::Tensor>& outputs) {
-    if (!loaded_) return utils::ErrorCode::kNotInitialized;
+    ATLAS_LOGD("%s called, num_inputs=%zu", __FUNCTION__, inputs.size());
+    if (!loaded_) {
+        ATLAS_LOGE("Infer called before Load");
+        return utils::ErrorCode::kNotInitialized;
+    }
     if (inputs.size() != input_info_.size()) {
+        ATLAS_LOGE("Input count mismatch: expected %zu, got %zu",
+                   input_info_.size(), inputs.size());
         return utils::ErrorCode::kInvalidArgument;
     }
 
@@ -325,11 +343,18 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
             t.data != nullptr &&
             t.byte_size % sizeof(float) == 0) {
             itensor = tensor_factory.createTensor(tensor_shape);
-            if (itensor == nullptr) return utils::ErrorCode::kInferFailed;
+            if (itensor == nullptr) {
+                ATLAS_LOGE("Failed to create input ITensor[%zu]: %s", i,
+                           impl_->input_names[i].c_str());
+                return utils::ErrorCode::kInferFailed;
+            }
 
             const float* input_data = static_cast<const float*>(t.data);
             const size_t input_count = t.byte_size / sizeof(float);
             if (itensor->getSize() < input_count) {
+                ATLAS_LOGE(
+                    "Input ITensor[%zu] capacity too small: capacity %zu, need %zu",
+                    i, itensor->getSize(), input_count);
                 return utils::ErrorCode::kInvalidArgument;
             }
             std::copy(input_data, input_data + input_count, itensor->begin());
@@ -339,7 +364,11 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
                 static_cast<const unsigned char*>(t.data),
                 t.byte_size);
         }
-        if (itensor == nullptr) return utils::ErrorCode::kInferFailed;
+        if (itensor == nullptr) {
+            ATLAS_LOGE("Failed to create input ITensor[%zu]: %s", i,
+                       impl_->input_names[i].c_str());
+            return utils::ErrorCode::kInferFailed;
+        }
 
         if (inputs.size() > 1) {
             input_map.add(impl_->input_names[i].c_str(), itensor.get());
@@ -349,6 +378,8 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
 
     zdl::DlSystem::TensorMap output_map;
     if (output_info_.size() != impl_->output_names.size()) {
+        ATLAS_LOGE("Output metadata mismatch: expected %zu infos, got %zu names",
+                   output_info_.size(), impl_->output_names.size());
         return utils::ErrorCode::kInferFailed;
     }
 
@@ -357,6 +388,7 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
             ? impl_->snpe->execute(input_tensors[0].get(), output_map)
             : impl_->snpe->execute(input_map, output_map);
     if (!execute_ok) {
+        ATLAS_LOGE("SNPE execute failed");
         return utils::ErrorCode::kInferFailed;
     }
 
@@ -365,7 +397,11 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
     for (size_t i = 0; i < impl_->output_names.size(); ++i) {
         zdl::DlSystem::ITensor* out_itensor =
             output_map.getTensor(impl_->output_names[i].c_str());
-        if (out_itensor == nullptr) return utils::ErrorCode::kInferFailed;
+        if (out_itensor == nullptr) {
+            ATLAS_LOGE("Failed to get output tensor[%zu]: %s", i,
+                       impl_->output_names[i].c_str());
+            return utils::ErrorCode::kInferFailed;
+        }
 
         const utils::TensorInfo& info = output_info_[i];
         size_t elem_size  = utils::ElementByteSize(info.dtype);
@@ -411,17 +447,23 @@ bool SnpeBackend::IsLoaded() const { return loaded_; }
 // ---------------------------------------------------------------------------
 
 utils::ErrorCode SnpeBackend::BuildTensorInfos() {
+    ATLAS_LOGD("%s called", __FUNCTION__);
     input_info_.clear();
     output_info_.clear();
 
     for (const auto& name : impl_->input_names) {
         auto opt_attrs = impl_->snpe->getInputOutputBufferAttributes(name.c_str());
         if (!opt_attrs || *opt_attrs == nullptr) {
+            ATLAS_LOGE("Failed to get input buffer attributes for tensor: %s",
+                       name.c_str());
             return utils::ErrorCode::kInferFailed;
         }
 
         auto opt_shape = impl_->snpe->getInputDimensions(name.c_str());
-        if (!opt_shape) return utils::ErrorCode::kInferFailed;
+        if (!opt_shape) {
+            ATLAS_LOGE("Failed to get input dimensions for tensor: %s", name.c_str());
+            return utils::ErrorCode::kInferFailed;
+        }
 
         const auto& shape = *opt_shape;
         utils::TensorInfo info;
@@ -433,6 +475,7 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
         info.layout = InferLayoutFromShape(shape);
         info.dtype = ParseDataType((*opt_attrs)->getEncodingType());
         if (info.dtype == utils::DataType::kUnknown) {
+            ATLAS_LOGE("Unsupported input dtype for tensor: %s", name.c_str());
             return utils::ErrorCode::kInferFailed;
         }
         input_info_.push_back(std::move(info));
@@ -441,6 +484,8 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
     for (const auto& name : impl_->output_names) {
         auto opt_attrs = impl_->snpe->getInputOutputBufferAttributes(name.c_str());
         if (!opt_attrs || *opt_attrs == nullptr) {
+            ATLAS_LOGE("Failed to get output buffer attributes for tensor: %s",
+                       name.c_str());
             return utils::ErrorCode::kInferFailed;
         }
 
@@ -454,6 +499,7 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
         info.layout = InferLayoutFromShape(shape);
         info.dtype = ParseDataType((*opt_attrs)->getEncodingType());
         if (info.dtype == utils::DataType::kUnknown) {
+            ATLAS_LOGE("Unsupported output dtype for tensor: %s", name.c_str());
             return utils::ErrorCode::kInferFailed;
         }
         output_info_.push_back(std::move(info));

@@ -33,25 +33,35 @@ class SnpeBackendTest : public ::testing::Test {
 };
 
 // ---------------------------------------------------------------------------
-// SnpeBackend stub tests
+// SnpeBackend basic tests
 // ---------------------------------------------------------------------------
 
 TEST_F(SnpeBackendTest, InitialStateIsNotLoaded) {
     EXPECT_FALSE(backend_.IsLoaded());
 }
 
-TEST_F(SnpeBackendTest, LoadReturnsBackendNotFound) {
+TEST_F(SnpeBackendTest, LoadWithNonexistentModelReturnsError) {
     auto cfg = MakeModelConfig();
+#ifdef ATLAS_SNPE_ENABLED
+    EXPECT_EQ(backend_.Load(cfg.model_path, cfg),
+              utils::ErrorCode::kFileNotFound);
+#else
     EXPECT_EQ(backend_.Load(cfg.model_path, cfg),
               utils::ErrorCode::kBackendNotFound);
+#endif
     EXPECT_FALSE(backend_.IsLoaded());
 }
 
-TEST_F(SnpeBackendTest, LoadWithContextReturnsBackendNotFound) {
+TEST_F(SnpeBackendTest, LoadWithContextAndNonexistentModelReturnsError) {
     SnpeBackendContext ctx;
     auto cfg = MakeModelConfig();
+#ifdef ATLAS_SNPE_ENABLED
+    EXPECT_EQ(backend_.Load(cfg.model_path, cfg, &ctx),
+              utils::ErrorCode::kFileNotFound);
+#else
     EXPECT_EQ(backend_.Load(cfg.model_path, cfg, &ctx),
               utils::ErrorCode::kBackendNotFound);
+#endif
     EXPECT_FALSE(backend_.IsLoaded());
 }
 
@@ -91,10 +101,14 @@ TEST_F(SnpeBackendTest, BackendFactoryCreatesSnpeBackendContext) {
     EXPECT_EQ(ctx->BackendType(), "snpe");
 }
 
-TEST_F(SnpeBackendTest, ContextInitReturnsBackendNotFound) {
+TEST_F(SnpeBackendTest, ContextInitSucceedsOrReturnsBackendNotFound) {
     SnpeBackendContext ctx;
     std::unordered_map<std::string, std::string> config;
+#ifdef ATLAS_SNPE_ENABLED
+    EXPECT_EQ(ctx.Init(config), utils::ErrorCode::kOk);
+#else
     EXPECT_EQ(ctx.Init(config), utils::ErrorCode::kBackendNotFound);
+#endif
 }
 
 TEST_F(SnpeBackendTest, ContextBackendTypeIsSnpe) {

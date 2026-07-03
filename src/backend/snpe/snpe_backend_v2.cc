@@ -22,7 +22,7 @@
 #include "src/backend/snpe/snpe_backend_context.h"
 #include "src/utils/types.h"
 
-#define LOG_TAG "Atlas::SnpeBackend"
+#define LOG_TAG "Atlas::SnpeBE_V2"
 #include "src/utils/logger.h"
 
 namespace atlas {
@@ -194,6 +194,7 @@ SnpeBackend::~SnpeBackend() { Unload(); }
 utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
                                     const core::ModelConfig& config,
                                     IBackendContext* ctx) {
+    ATLAS_LOGD("%s called, model_path=%s", __FUNCTION__, model_path.c_str());
     Unload();
 
     if (ctx != nullptr) {
@@ -295,6 +296,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
 
 utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
                                      std::vector<utils::Tensor>& outputs) {
+    ATLAS_LOGD("%s called, num_inputs=%zu", __FUNCTION__, inputs.size());
     if (!loaded_) {
         ATLAS_LOGE("Infer called before Load");
         return utils::ErrorCode::kNotInitialized;
@@ -430,6 +432,7 @@ bool SnpeBackend::IsLoaded() const { return loaded_; }
 // ---------------------------------------------------------------------------
 
 utils::ErrorCode SnpeBackend::BuildTensorInfos() {
+    ATLAS_LOGD("%s called", __FUNCTION__);
     input_info_.clear();
     output_info_.clear();
 

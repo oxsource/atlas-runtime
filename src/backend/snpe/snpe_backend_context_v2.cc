@@ -7,6 +7,9 @@
 
 #include "src/backend/base/backend_factory.h"
 
+#define LOG_TAG "Atlas::SnpeCtx_V2"
+#include "src/utils/logger.h"
+
 namespace atlas {
 namespace backend {
 
@@ -20,6 +23,7 @@ SnpeBackendContext::SnpeBackendContext() = default;
 
 SnpeBackendContext::~SnpeBackendContext() {
     if (initialized_) {
+        ATLAS_LOGD("terminateLogging");
         SNPE::SNPEFactory::terminateLogging();
     }
 }
@@ -30,6 +34,7 @@ std::string_view SnpeBackendContext::BackendType() const {
 
 utils::ErrorCode SnpeBackendContext::Init(
     const std::unordered_map<std::string, std::string>& config) {
+    ATLAS_LOGD("%s called", __FUNCTION__);
     if (initialized_) return utils::ErrorCode::kOk;
 
     // Only global config fields (e.g. log level) would be extracted here;
@@ -39,10 +44,12 @@ utils::ErrorCode SnpeBackendContext::Init(
     // 2.x: initializeLogging with LogLevel_t parameter.
     if (!SNPE::SNPEFactory::initializeLogging(
             DlSystem::LogLevel_t::LOG_WARN)) {
+        ATLAS_LOGE("SNPE initializeLogging failed");
         return utils::ErrorCode::kInferFailed;
     }
 
     initialized_ = true;
+    ATLAS_LOGI("SnpeBackendContext initialized (SNPE 2.x)");
     return utils::ErrorCode::kOk;
 }
 

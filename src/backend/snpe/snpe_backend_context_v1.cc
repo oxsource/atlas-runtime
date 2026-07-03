@@ -8,6 +8,9 @@
 
 #include "src/backend/base/backend_factory.h"
 
+#define LOG_TAG "Atlas::SnpeCtx_V1"
+#include "src/utils/logger.h"
+
 namespace atlas {
 namespace backend {
 
@@ -29,6 +32,7 @@ std::string_view SnpeBackendContext::BackendType() const {
 
 utils::ErrorCode SnpeBackendContext::Init(
     const std::unordered_map<std::string, std::string>& config) {
+    ATLAS_LOGD("%s called", __FUNCTION__);
     if (initialized_) return utils::ErrorCode::kOk;
 
     // Only global config fields (e.g. log level) would be extracted here;
@@ -37,6 +41,7 @@ utils::ErrorCode SnpeBackendContext::Init(
 
     // SNPE 1.x does not provide initializeLogging().
     initialized_ = true;
+    ATLAS_LOGI("SnpeBackendContext initialized (SNPE 1.x)");
     return utils::ErrorCode::kOk;
 }
 

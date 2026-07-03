@@ -57,6 +57,7 @@ cc_library(
     deps = [
         "//src/backend/base:backend_factory",
         "//src/backend/base:i_backend_context",
+        "//src/utils:logger",
         "//src/utils:types",
     ] + SNPE_SDK_DEP,
     alwayslink = 1,
