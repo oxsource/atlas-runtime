@@ -797,3 +797,53 @@ SNPE `.dlc` 模型转换过程中可能内嵌标准化（mean/std）预处理。
 | 3 | `bazel query 'deps(//src/backend/snpe:snpe_backend)' --output=build \| grep snpe_backend_v` | `android_arm64` 选中 `snpe_backend_v{N}.cc` |
 | 4 | 交叉编译 `--config=android_arm64` | 零错误 |
 | 5 | `file bazel-bin/.../libsnpe_backend.so` | `ELF 64-bit LSB shared object, ARM aarch64` |
+
+---
+
+## 七、开发环境配置
+
+### 7.1 环境变量
+
+在 shell 配置文件（`~/.bashrc`、`~/.zshrc`）中添加以下内容，根据目标 SNPE 版本取消对应注释：
+
+```bash
+# --- SNPE 2.x (默认，推荐) ---
+# 方式一：source SDK 自带脚本（自动设置 SNPE_ROOT、PYTHONPATH、PATH 等）
+source /opt/qcom/aistack/qairt/2.21.0.240401/bin/envsetup.sh
+# 方式二：手动设置
+# export SNPE_ROOT=/opt/qcom/aistack/qairt/2.21.0.240401
+
+# --- SNPE 1.x（无 envsetup.sh，需手动设置） ---
+# export SNPE_ROOT=/opt/qcom/sdk/snpe-1.50.0.2622
+
+export SNPE_SDK_PATH=$SNPE_ROOT
+export PYTHONPATH=$SNPE_ROOT/lib/python
+export PATH=$PATH:$SNPE_ROOT/bin/x86_64-linux-clang
+export ANDROID_NDK_HOME=/opt/local/usr/android/ndk/25.2.9519653
+```
+
+> **说明**：
+> - `SNPE_ROOT`：SNPE SDK 安装根目录，Bazel 构建时通过 `snpe_repo.bzl` 自动检测
+> - `SNPE_SDK_PATH`：由 `SNPE_ROOT` 导出，`@snpe_sdk` 仓库规则读取此变量创建符号链接
+> - `PYTHONPATH`：模型转换工具（`snpe-onnx-to-dlc`）的 Python 依赖路径
+> - `PATH`：SNPE 命令行工具（模型转换、量化等）所在目录
+> - `ANDROID_NDK_HOME`：交叉编译 Android arm64 目标所需的 NDK 路径
+
+### 7.2 Python 虚拟环境
+
+推荐使用 [uv](https://docs.astral.sh/uv/) 管理 Python 版本和虚拟环境。SNPE 模型转换工具依赖特定版本的 Python 及以下包：
+
+| SNPE 版本 | Python 版本 | 创建与激活命令 |
+|-----------|------------|---------------|
+| 1.x（1.50.0） | 3.6 | `uv venv .venv36 --python 3.6 && source .venv36/bin/activate`（需 Ubuntu 18.04） |
+| 2.x（2.21.0） | 3.8 | `uv venv .venv38 --python 3.8 && source .venv38/bin/activate` |
+
+激活虚拟环境后安装依赖：
+
+```bash
+uv pip install onnx
+uv pip install pyyaml
+uv pip install packaging
+```
+
+> `.venv/`、`.venv36`、`.venv38` 均已加入 `.gitignore`，不会被提交到版本控制。
