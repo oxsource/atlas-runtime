@@ -11,11 +11,13 @@
 
 #include <cstddef>
 #include <cstdlib>
-#include <cstring>
-#include <iostream>
+#include <string>
 #include <vector>
 
 #include "atlas/atlas.h"
+
+#define LOG_TAG "snpe_cpu"
+#include "src/utils/logger.h"
 
 namespace {
 
@@ -56,23 +58,18 @@ int ArgMaxAbs(const float* data, size_t count) {
     return best;
 }
 
-// ---------------------------------------------------------------------------
-// Prints a formatted section banner.
-// ---------------------------------------------------------------------------
-void Banner(const char* title) {
-    std::cout << "\n-- " << title << " --\n";
-}
-
 }  // namespace
 
 int main(int argc, char* argv[]) {
-    std::cout << "Atlas SNPE CPU Runtime Sample  (v"
-              << atlas::utils::VersionString() << ")\n";
+    atlas::utils::Logger::SetLevel(atlas::utils::Logger::Level::Debug);
+
+    ATLAS_LOGD("Atlas SNPE CPU Runtime Sample  (v%s)",
+               atlas::utils::VersionString());
 
     if (argc < 2) {
-        std::cerr << "Usage: snpe_cpu <manifest_path>\n"
-                  << "  Set SAMPLE_MODEL_DIR to the directory containing\n"
-                  << "  identity_snpe.dlc before running.\n";
+        ATLAS_LOGE("Usage: snpe_cpu <manifest_path>\n"
+                   "  Set SAMPLE_MODEL_DIR to the directory containing\n"
+                   "  identity_snpe.dlc before running.");
         return 1;
     }
     const std::string manifest_path = argv[1];
@@ -80,94 +77,94 @@ int main(int argc, char* argv[]) {
     // -- Step 1: Initialize AtlasRuntime ---------------------------------
     // Parses the manifest, creates a shared SnpeBackendContext,
     // and eagerly loads the SNPE model (load_strategy: eager).
-    Banner("Step 1: Initialize");
+    ATLAS_LOGD("-- Step 1: Initialize --");
     atlas::api::AtlasRuntime runtime;
     auto ret = runtime.Init(manifest_path);
     if (ret != atlas::utils::ErrorCode::kOk) {
-        std::cerr << "[ERROR] Init failed: "
-                  << atlas::utils::ErrorCodeToString(ret) << "\n";
+        ATLAS_LOGE("[ERROR] Init failed: %s",
+                   atlas::utils::ErrorCodeToString(ret));
         return 1;
     }
-    std::cout << "Runtime initialized from: " << manifest_path << "\n";
+    ATLAS_LOGD("Runtime initialized from: %s", manifest_path.c_str());
 
     // -- Step 2: Obtain model handle -------------------------------------
-    Banner("Step 2: Get Model Handle");
+    ATLAS_LOGD("-- Step 2: Get Model Handle --");
     auto model = runtime.GetModel("snpe_identity");
     if (!model.IsValid()) {
-        std::cerr << "[ERROR] Failed to obtain model handle.\n";
+        ATLAS_LOGE("[ERROR] Failed to obtain model handle.");
         return 1;
     }
 
     // Print model metadata.
     const auto infos = model.GetInputInfo();
-    std::cout << "[snpe_identity] input '" << infos[0].name
-              << "'  shape: [";
-    for (int d : infos[0].shape) std::cout << d << ",";
-    std::cout << "]\n";
+    {
+        std::string shape_str = "[snpe_identity] input '" + infos[0].name
+                                + "'  shape: [";
+        for (int d : infos[0].shape) shape_str += std::to_string(d) + ",";
+        shape_str += "]";
+        ATLAS_LOGD("%s", shape_str.c_str());
+    }
 
-    std::cout << "[snpe_identity] backend:      "
-              << model.GetBackend() << "\n"
-              << "[snpe_identity] model_path:   "
-              << model.GetModelPath() << "\n"
-              << "[snpe_identity] load_strategy: "
-              << model.GetLoadStrategy();
-    std::cout << " ("
-              << (model.GetLoadStrategy() == 0 ? "eager" : "lazy")
-              << ")\n";
+    ATLAS_LOGD("[snpe_identity] backend:      %s",
+               model.GetBackend().c_str());
+    ATLAS_LOGD("[snpe_identity] model_path:   %s",
+               model.GetModelPath().c_str());
+    ATLAS_LOGD("[snpe_identity] load_strategy: %d (%s)",
+               model.GetLoadStrategy(),
+               model.GetLoadStrategy() == 0 ? "eager" : "lazy");
 
     const auto cfg = model.GetConfig();
     if (!cfg.empty()) {
-        std::cout << "[snpe_identity] config:       {";
+        std::string cfg_str = "[snpe_identity] config:       {";
         bool first = true;
         for (const auto& [k, v] : cfg) {
-            if (!first) std::cout << ", ";
-            std::cout << k << ": " << v;
+            if (!first) cfg_str += ", ";
+            cfg_str += k + ": " + v;
             first = false;
         }
-        std::cout << "}\n";
+        cfg_str += "}";
+        ATLAS_LOGD("%s", cfg_str.c_str());
     }
 
     // -- Step 3: Prepare input -------------------------------------------
     // The Pipeline auto-converts: uint8 HWC BGR -> float32 NCHW RGB.
-    Banner("Step 3: Create Input Image");
+    ATLAS_LOGD("-- Step 3: Create Input Image --");
     constexpr int kH = 4, kW = 4;
     auto raw_image = CreateSampleBGRImage(kH, kW);
-    std::cout << "Created " << kH << "x" << kW
-              << " BGR image (HWC uint8).\n";
+    ATLAS_LOGD("Created %dx%d BGR image (HWC uint8).", kH, kW);
 
     // -- Step 4: Run inference --------------------------------------------
-    Banner("Step 4: Run SNPE Inference (CPU Runtime)");
+    ATLAS_LOGD("-- Step 4: Run SNPE Inference (CPU Runtime) --");
     std::vector<atlas::utils::Tensor> outputs;
     ret = model.Run(raw_image, &outputs);
 
     if (ret == atlas::utils::ErrorCode::kBackendNotFound) {
-        std::cout << "SNPE backend not available on this platform "
-                  << "(stub returned kBackendNotFound).\n"
-                  << "This is expected on non-aarch64 hosts. "
-                  << "Run on linux_aarch64 or android_arm64 to execute.\n";
+        ATLAS_LOGD("SNPE backend not available on this platform "
+                   "(stub returned kBackendNotFound).");
+        ATLAS_LOGD("This is expected on non-aarch64 hosts. "
+                   "Run on linux_aarch64 or android_arm64 to execute.");
         runtime.Release();
-        std::cout << "\nRuntime released. Done.\n";
+        ATLAS_LOGD("Runtime released. Done.");
         return 0;
     }
 
     if (ret != atlas::utils::ErrorCode::kOk) {
-        std::cerr << "[ERROR] Inference failed: "
-                  << atlas::utils::ErrorCodeToString(ret) << "\n";
+        ATLAS_LOGE("[ERROR] Inference failed: %s",
+                   atlas::utils::ErrorCodeToString(ret));
         return 1;
     }
 
     // -- Step 5: Print results -------------------------------------------
-    Banner("Step 5: Results");
+    ATLAS_LOGD("-- Step 5: Results --");
     const float* out_data  = static_cast<const float*>(outputs[0].data);
     const size_t out_count = outputs[0].byte_size / sizeof(float);
     int   top1  = ArgMaxAbs(out_data, out_count);
     float value = out_data[top1];
-    std::cout << "SNPE identity output: " << out_count
-              << " elements, top-1 index=" << top1
-              << "  value=" << value << "\n";
+    ATLAS_LOGD("SNPE identity output: %zu elements, top-1 index=%d  value=%f",
+               out_count, top1, value);
 
     // -- Step 6: Release --------------------------------------------------
     runtime.Release();
-    std::cout << "\nRuntime released. Done.\n";
+    ATLAS_LOGD("Runtime released. Done.");
     return 0;
 }

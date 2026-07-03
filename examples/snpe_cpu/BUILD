@@ -6,8 +6,10 @@
 cc_binary(
     name = "snpe_cpu",
     srcs = ["main.cc"],
+    copts = ["-DATLAS_ENABLE_LOGGING"],
     data = ["manifest.json"],
     deps = [
         "//src/public:atlas",
+        "//src/utils:logger",
     ],
 )
