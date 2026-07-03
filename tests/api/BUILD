@@ -7,6 +7,8 @@ cc_test(
         "//src/api:model_handle",
         "//src/backend/cpu:cpu_backend",
         "//src/backend/cpu:cpu_backend_context",
+        "//src/backend/snpe:snpe_backend",
+        "//src/backend/snpe:snpe_backend_context",
         "//src/utils:types",
         "@googletest//:gtest_main",
     ],

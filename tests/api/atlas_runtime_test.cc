@@ -14,6 +14,8 @@
 // Force registration of cpu backend and context via alwayslink deps.
 #include "src/backend/cpu/cpu_backend.h"
 #include "src/backend/cpu/cpu_backend_context.h"
+#include "src/backend/snpe/snpe_backend.h"
+#include "src/backend/snpe/snpe_backend_context.h"
 
 namespace atlas {
 namespace api {
@@ -32,6 +34,39 @@ std::string TestModelPath() {
     if (srcdir && ws)
         return std::string(srcdir) + "/" + ws + "/" + rel;
     return rel;
+}
+
+std::string SnpeTestModelPath() {
+    const char* sample_model_dir = std::getenv("SAMPLE_MODEL_DIR");
+    if (sample_model_dir != nullptr) {
+        const std::string path =
+            std::string(sample_model_dir) + "/identity_snpe.dlc";
+        std::ifstream probe(path);
+        if (probe.good()) return path;
+    }
+
+    const std::string repo_rel = "tests/backend/snpe/test_data/identity_1x3x4x4.dlc";
+    {
+        std::ifstream probe(repo_rel);
+        if (probe.good()) return repo_rel;
+    }
+
+    const std::string sample_rel = "/tmp/snpe_sample_models/identity_snpe.dlc";
+    {
+        std::ifstream probe(sample_rel);
+        if (probe.good()) return sample_rel;
+    }
+
+    const char* srcdir = std::getenv("TEST_SRCDIR");
+    const char* ws     = std::getenv("TEST_WORKSPACE");
+    if (srcdir && ws) {
+        const std::string path =
+            std::string(srcdir) + "/" + ws + "/" + repo_rel;
+        std::ifstream probe(path);
+        if (probe.good()) return path;
+    }
+
+    return {};
 }
 
 // Writes a manifest JSON to a temp file and returns the path.
@@ -86,6 +121,24 @@ std::string MultiModelManifest(const std::string& model_path) {
       "config": {"num_threads":"1"}
     }
   ]
+})";
+    return ss.str();
+}
+
+std::string SnpeSingleModelManifest(const std::string& model_path) {
+    std::ostringstream ss;
+    ss << R"({
+    "version": "1.0",
+    "name": "snpe-rt-test",
+    "models": [{
+        "id": "snpe_identity",
+        "backend": "snpe",
+        "model_path": ")" << model_path << R"(",
+        "load_strategy": "eager",
+        "inputs":  [{"name":"images","shape":[1,3,4,4],"dtype":"float32","layout":"NCHW"}],
+        "outputs": [{"name":"output","shape":[1,3,4,4],"dtype":"float32"}],
+        "config": {"runtime":"cpu"}
+    }]
 })";
     return ss.str();
 }
@@ -210,6 +263,53 @@ TEST(AtlasRuntimeTest, MultiModelBothModelsRunSuccessfully) {
     EXPECT_FLOAT_EQ(pa[0], expected);
     const float* pb = static_cast<const float*>(out_b[0].data);
     EXPECT_FLOAT_EQ(pb[0], expected);
+}
+
+TEST(AtlasRuntimeTest, SnpeEndToEndInferenceUsesRuntimeReportedInputLayout) {
+    const char* run_snpe_tests = std::getenv("ATLAS_RUN_SNPE_TESTS");
+    if (run_snpe_tests == nullptr || std::string(run_snpe_tests) != "1") {
+        GTEST_SKIP() << "Set ATLAS_RUN_SNPE_TESTS=1 to enable SNPE integration regression tests";
+    }
+
+    const std::string model_path = SnpeTestModelPath();
+    if (model_path.empty()) {
+        GTEST_SKIP() << "SNPE test model not available";
+    }
+
+    AtlasRuntime rt;
+    auto manifest_path = WriteTempManifest(SnpeSingleModelManifest(model_path));
+    auto init_ret = rt.Init(manifest_path);
+    if (init_ret == utils::ErrorCode::kBackendNotFound) {
+        GTEST_SKIP() << "SNPE backend not available on this platform";
+    }
+    ASSERT_EQ(init_ret, utils::ErrorCode::kOk);
+
+    auto handle = rt.GetModel("snpe_identity");
+    ASSERT_TRUE(handle.IsValid());
+
+    const auto input_infos = handle.GetInputInfo();
+    ASSERT_EQ(input_infos.size(), 1u);
+    EXPECT_FALSE(input_infos[0].shape.empty());
+    EXPECT_TRUE(input_infos[0].layout == "NHWC" ||
+                input_infos[0].layout == "NCHW");
+
+    constexpr uint8_t kFill = 100;
+    auto input = MakeRawHWCImage(kFill);
+    std::vector<utils::Tensor> outputs;
+    ASSERT_EQ(handle.Run(input, &outputs), utils::ErrorCode::kOk);
+    ASSERT_EQ(outputs.size(), 1u);
+
+    const float* data = static_cast<const float*>(outputs[0].data);
+    const size_t count = outputs[0].byte_size / sizeof(float);
+    ASSERT_GT(count, 0u);
+    bool has_non_zero = false;
+    for (size_t i = 0; i < count; ++i) {
+        if (data[i] != 0.0f) {
+            has_non_zero = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(has_non_zero);
 }
 
 TEST(ModelHandleTest, DefaultHandleIsInvalid) {
