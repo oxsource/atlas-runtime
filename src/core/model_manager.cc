@@ -120,6 +120,21 @@ utils::ErrorCode ModelManager::EnsureLoaded(ModelEntry* entry) {
                                      entry->config,
                                      ctx);
     if (ret == utils::ErrorCode::kOk) {
+        const auto backend_input_infos = entry->backend->GetInputInfo();
+        for (size_t i = 0; i < entry->config.inputs.size(); ++i) {
+            const auto& input = entry->config.inputs[i];
+            if (!input.pipeline.empty() || input.disable_pipeline) {
+                continue;
+            }
+            if (i < backend_input_infos.size()) {
+                auto target_info = backend_input_infos[i];
+                target_info.name = input.name;
+                target_info.has_normalize = input.has_normalize;
+                target_info.normalize = input.normalize;
+                entry->input_pipelines[i] =
+                    pipeline::Pipeline::BuildInputPipeline(target_info);
+            }
+        }
         entry->loaded = true;
     }
     return ret;

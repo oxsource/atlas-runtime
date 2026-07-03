@@ -24,6 +24,7 @@ __pycache__/
 atlas-sdk/
 
 # Environment and secrets
+.venv*/
 .env
 .env.*
 *.key
