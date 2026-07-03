@@ -11,6 +11,7 @@ load("@snpe_sdk//:version.bzl", "SNPE_MAJOR")
 # SNPE_ENABLED is defined only on target platforms (linux_aarch64 / android_arm64).
 SNPE_PLATFORM = select({
     "//platforms:linux_aarch64": ["ATLAS_SNPE_ENABLED=1"],
+    "//platforms:linux_x86_64": ["ATLAS_SNPE_ENABLED=1"],
     "//platforms:android_arm64": ["ATLAS_SNPE_ENABLED=1"],
     "//conditions:default": [],
 })
@@ -18,6 +19,7 @@ SNPE_PLATFORM = select({
 # SDK dependency — only linked on target platforms.
 SNPE_SDK_DEP = select({
     "//platforms:linux_aarch64": ["@snpe_sdk//:snpe"],
+    "//platforms:linux_x86_64": ["@snpe_sdk//:snpe"],
     "//platforms:android_arm64": ["@snpe_sdk//:snpe"],
     "//conditions:default": [],
 })
@@ -35,12 +37,14 @@ _CONTEXT_V = (
 
 SNPE_BACKEND_SRC = select({
     "//platforms:linux_aarch64": _BACKEND_V,
+    "//platforms:linux_x86_64": _BACKEND_V,
     "//platforms:android_arm64": _BACKEND_V,
     "//conditions:default": ["snpe_backend_stub.cc"],
 })
 
 SNPE_CONTEXT_SRC = select({
     "//platforms:linux_aarch64": _CONTEXT_V,
+    "//platforms:linux_x86_64": _CONTEXT_V,
     "//platforms:android_arm64": _CONTEXT_V,
     "//conditions:default": ["snpe_backend_context_stub.cc"],
 })
@@ -69,6 +73,7 @@ cc_library(
         "//src/backend/base:backend_factory",
         "//src/backend/base:i_backend",
         "//src/core:manifest_config",
+        "//src/utils:logger",
         "//src/utils:types",
     ] + SNPE_SDK_DEP,
     alwayslink = 1,

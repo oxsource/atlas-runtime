@@ -16,6 +16,9 @@ cc_library(
         "@//platforms:linux_aarch64": glob([
             "snpe_sdk_root/lib/aarch64-oe-linux-gcc8.2/*.so",
         ]),
+        "@//platforms:linux_x86_64": glob([
+            "snpe_sdk_root/lib/x86_64-linux-clang/*.so",
+        ]),
         "@//platforms:android_arm64": glob([
             "snpe_sdk_root/lib/aarch64-android/*.so",
         ]),
