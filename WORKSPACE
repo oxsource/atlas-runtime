@@ -13,11 +13,6 @@ android_ndk_repository(
     api_level = 24,
 )
 
-bind(
-    name = "android/crosstool",
-    actual = "@androidndk//:toolchain",
-)
-
 atlas_android_setup()
 
 # SNPE SDK.
