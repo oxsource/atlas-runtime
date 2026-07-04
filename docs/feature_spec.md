@@ -90,6 +90,7 @@ docs/
 │   ├── 002-model-encryption.md
 │   └── ...
 ├── architecture.md
+├── deps_spec.md
 ├── phase_spec.md
 ├── phase1.md
 └── ...

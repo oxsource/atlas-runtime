@@ -5,6 +5,9 @@
 # Internal targets (tests, examples) continue to depend on granular targets
 # under src/api, src/core, etc.
 
+load("//third_party/onnxruntime:defs.bzl", "onnxruntime_deps")
+load("//third_party/snpe:defs.bzl", "snpe_sdk_deps")
+
 cc_library(
     name = "atlas",
     hdrs = glob(["include/atlas/*.h"]),
@@ -28,14 +31,7 @@ cc_library(
         "//src/pipeline:pipeline",
         "//src/utils:types",
         "//src/utils:version",
-    ] + select({
-        "//platforms:macos_arm64":    ["@onnxruntime_macos_arm64//:onnxruntime"],
-        "//platforms:macos_x86_64":   ["@onnxruntime_macos_arm64//:onnxruntime"],
-        "//platforms:linux_aarch64":  ["@onnxruntime_linux_aarch64//:onnxruntime"],
-        "//platforms:android_arm64":  ["@onnxruntime_android_arm64//:onnxruntime"],
-        "//platforms:android_x86_64": ["@onnxruntime_android_x86_64//:onnxruntime"],
-        "//conditions:default":       ["@onnxruntime_linux_x86_64//:onnxruntime"],
-    }),
+    ] + onnxruntime_deps() + snpe_sdk_deps(),
     visibility = ["//visibility:public"],
 )
 

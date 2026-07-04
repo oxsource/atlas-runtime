@@ -6,69 +6,34 @@
 #
 # Version is declared in WORKSPACE; no --define or --config=snpe_vN needed.
 
-load("@snpe_sdk//:version.bzl", "SNPE_MAJOR")
-
-# SNPE_ENABLED is defined only on target platforms (linux_aarch64 / android_arm64).
-SNPE_PLATFORM = select({
-    "//platforms:linux_aarch64": ["ATLAS_SNPE_ENABLED=1"],
-    "//platforms:linux_x86_64": ["ATLAS_SNPE_ENABLED=1"],
-    "//platforms:android_arm64": ["ATLAS_SNPE_ENABLED=1"],
-    "//conditions:default": [],
-})
-
-# SDK dependency — only linked on target platforms.
-SNPE_SDK_DEP = select({
-    "//platforms:linux_aarch64": ["@snpe_sdk//:snpe"],
-    "//platforms:linux_x86_64": ["@snpe_sdk//:snpe"],
-    "//platforms:android_arm64": ["@snpe_sdk//:snpe"],
-    "//conditions:default": [],
-})
-
-# Version-specific source files: _v1.cc / _v2.cc when SDK is available,
-# _stub.cc otherwise (no SDK or non-target platform).
-_BACKEND_V = (
-    ["snpe_backend_v" + SNPE_MAJOR + ".cc"] if SNPE_MAJOR
-    else ["snpe_backend_stub.cc"]
+load(
+    "//third_party/snpe:defs.bzl",
+    "snpe_backend_srcs",
+    "snpe_context_srcs",
+    "snpe_platform_defines",
+    "snpe_sdk_deps",
 )
-_CONTEXT_V = (
-    ["snpe_backend_context_v" + SNPE_MAJOR + ".cc"] if SNPE_MAJOR
-    else ["snpe_backend_context_stub.cc"]
-)
-
-SNPE_BACKEND_SRC = select({
-    "//platforms:linux_aarch64": _BACKEND_V,
-    "//platforms:linux_x86_64": _BACKEND_V,
-    "//platforms:android_arm64": _BACKEND_V,
-    "//conditions:default": ["snpe_backend_stub.cc"],
-})
-
-SNPE_CONTEXT_SRC = select({
-    "//platforms:linux_aarch64": _CONTEXT_V,
-    "//platforms:linux_x86_64": _CONTEXT_V,
-    "//platforms:android_arm64": _CONTEXT_V,
-    "//conditions:default": ["snpe_backend_context_stub.cc"],
-})
 
 cc_library(
     name = "snpe_backend_context",
-    srcs = SNPE_CONTEXT_SRC,
+    srcs = snpe_context_srcs(),
     hdrs = ["snpe_backend_context.h"],
-    defines = SNPE_PLATFORM,
+    defines = snpe_platform_defines(),
     deps = [
         "//src/backend/base:backend_factory",
         "//src/backend/base:i_backend_context",
         "//src/utils:logger",
         "//src/utils:types",
-    ] + SNPE_SDK_DEP,
+    ] + snpe_sdk_deps(),
     alwayslink = 1,
     visibility = ["//visibility:public"],
 )
 
 cc_library(
     name = "snpe_backend",
-    srcs = SNPE_BACKEND_SRC,
+    srcs = snpe_backend_srcs(),
     hdrs = ["snpe_backend.h"],
-    defines = SNPE_PLATFORM,
+    defines = snpe_platform_defines(),
     deps = [
         ":snpe_backend_context",
         "//src/backend/base:backend_factory",
@@ -76,7 +41,7 @@ cc_library(
         "//src/core:manifest_config",
         "//src/utils:logger",
         "//src/utils:types",
-    ] + SNPE_SDK_DEP,
+    ] + snpe_sdk_deps(),
     alwayslink = 1,
     visibility = ["//visibility:public"],
 )

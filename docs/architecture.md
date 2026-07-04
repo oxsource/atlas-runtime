@@ -175,6 +175,7 @@ atlas/
 │   ├── architecture.md     # 总则：整体架构、模块说明、阶段划分
 │   ├── code_spec.md        # 代码规范（全局适用）
 │   ├── doc_spec.md         # 文档管理总则：编写规范与定期梳理
+│   ├── deps_spec.md        # 三方依赖规范：平台差异配置与 defs 复用
 │   ├── feature_spec.md     # Feature 管理总则：提议收集与流转规范
 │   ├── bugfix_spec.md      # Bugfix 管理总则：缺陷报告与修复规范
 │   ├── phase_spec.md       # 阶段开发规范与流程

@@ -11,6 +11,7 @@ docs/
 ├── architecture.md          # 总则：整体架构、模块说明、阶段划分
 ├── code_spec.md             # 代码规范（全局适用）
 ├── doc_spec.md              # 本文档：文档管理规范
+├── deps_spec.md             # 三方依赖管理规范
 ├── feature_spec.md          # Feature 管理总则
 ├── bugfix_spec.md           # Bugfix 管理总则
 ├── phase_spec.md            # 阶段开发规范与流程
@@ -28,7 +29,7 @@ docs/
 | 类型 | 文件 | 版本头 | 说明 |
 |------|------|--------|------|
 | 总则 | `architecture.md` | 不需要 | 架构总纲，阶段划分固定为阶段一至六 |
-| 规范 | `code_spec.md`、`doc_spec.md`、`feature_spec.md`、`bugfix_spec.md`、`phase_spec.md` | 不需要 | 全局适用的流程与规则 |
+| 规范 | `code_spec.md`、`doc_spec.md`、`deps_spec.md`、`feature_spec.md`、`bugfix_spec.md`、`phase_spec.md` | 不需要 | 全局适用的流程与规则 |
 | 阶段方案 | `phase{N}.md` | **必须** | 每个阶段的设计文档，固定 6 份 |
 | 阶段结果 | `phase{N}_result.md` | 不需要 | 阶段完成后的交付归档，按需创建 |
 | 提议 | `proposals/NNN-*.md` | 使用 Proposal 模板头 | Feature 提议，编号递增不回收 |
