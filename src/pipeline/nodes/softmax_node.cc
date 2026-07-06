@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "src/pipeline/pipeline_node_factory.h"
+#include "src/utils/strings.h"
 #include "src/utils/types.h"
 
 namespace atlas {
@@ -110,11 +111,11 @@ std::unique_ptr<IPipelineNode> SoftmaxNode::CreateFromParams(
     if (it == params.end()) {
         return std::make_unique<SoftmaxNode>(-1);
     }
-    try {
-        return std::make_unique<SoftmaxNode>(std::stoi(it->second));
-    } catch (...) {
+    int axis = -1;
+    if (utils::Strings::ParseInt(it->second, &axis) != utils::ErrorCode::kOk) {
         return nullptr;
     }
+    return std::make_unique<SoftmaxNode>(axis);
 }
 
 }  // namespace pipeline

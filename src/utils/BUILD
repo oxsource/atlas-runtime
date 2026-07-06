@@ -21,3 +21,11 @@ cc_library(
     hdrs = ["version.h"],
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "strings",
+    srcs = ["strings.cc"],
+    hdrs = ["strings.h"],
+    deps = [":types"],
+    visibility = ["//visibility:public"],
+)

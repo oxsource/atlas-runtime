@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "src/pipeline/pipeline_node_factory.h"
+#include "src/utils/strings.h"
 #include "src/utils/types.h"
 
 namespace atlas {
@@ -83,13 +84,12 @@ std::unique_ptr<IPipelineNode> TopKNode::CreateFromParams(
     const std::unordered_map<std::string, std::string>& params) {
     auto it = params.find("k");
     if (it == params.end()) return nullptr;
-    try {
-        const int k = std::stoi(it->second);
-        if (k <= 0) return nullptr;
-        return std::make_unique<TopKNode>(k);
-    } catch (...) {
+    int k = 0;
+    if (utils::Strings::ParseInt(it->second, &k) != utils::ErrorCode::kOk) {
         return nullptr;
     }
+    if (k <= 0) return nullptr;
+    return std::make_unique<TopKNode>(k);
 }
 
 }  // namespace pipeline

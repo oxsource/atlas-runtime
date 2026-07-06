@@ -266,9 +266,9 @@ Android NDK（libc++）环境中，`std::locale` 的静态初始化顺序在不�
 
 | 禁止类型 | 原因 | 替代方案 |
 |----------|------|----------|
-| `std::stringstream` / `std::istringstream` / `std::ostringstream` | 构造时触发 `std::locale` 初始化 | C 标准库：`std::strtof`、`std::sscanf`、`std::snprintf` |
+| `std::stringstream` / `std::istringstream` / `std::ostringstream` | 构造时触发 `std::locale` 初始化 | C 标准库：`std::strtof`、`std::sscanf`、`std::snprintf`；或 `atlas::utils::Strings` 工具类 |
 | `std::ifstream` / `std::ofstream` / `std::fstream` | 构造时在运行时初始化 `std::locale` | C stdio：`fopen` / `fread` / `fwrite` |
-| `std::stoi` / `std::stof` / `std::stod`（仅限静态初始化路径） | 实现路径可能触发 locale | `std::strtol` / `std::strtof` / `std::strtod` |
+| `std::stoi` / `std::stof` / `std::stod`（仅限静态初始化路径） | 实现路径可能触发 locale | `atlas::utils::Strings::ParseInt` / 内部自行使用 `std::strtol` / `std::strtof` / `std::strtod` |
 
 **注意**：`std::stoi` 等在普通运行时调用一般安全，仅在静态初始化（如 `ATLAS_REGISTER_*` 宏中的 lambda）中需要警惕。但 `std::stringstream` / `std::ifstream` 无论在哪条路径都应避免。
 

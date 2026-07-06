@@ -75,6 +75,7 @@ cc_library(
     deps = [
         "//src/pipeline:pipeline_node",
         "//src/pipeline:pipeline_node_factory",
+        "//src/utils:strings",
         "//src/utils:types",
     ],
     alwayslink = 1,
@@ -101,6 +102,7 @@ cc_library(
     deps = [
         "//src/pipeline:pipeline_node",
         "//src/pipeline:pipeline_node_factory",
+        "//src/utils:strings",
         "//src/utils:types",
     ],
     alwayslink = 1,
@@ -114,6 +116,7 @@ cc_library(
     deps = [
         "//src/pipeline:pipeline_node",
         "//src/pipeline:pipeline_node_factory",
+        "//src/utils:strings",
         "//src/utils:types",
     ],
     alwayslink = 1,

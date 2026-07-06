@@ -21,6 +21,7 @@ cc_library(
         "//src/backend/base:backend_factory",
         "//src/backend/base:i_backend",
         "//src/utils:logger",
+        "//src/utils:strings",
         "//src/utils:types",
     ] + onnxruntime_deps(),
     alwayslink = 1,

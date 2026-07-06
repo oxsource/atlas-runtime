@@ -7,3 +7,12 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "strings_test",
+    srcs = ["strings_test.cc"],
+    deps = [
+        "//src/utils:strings",
+        "@googletest//:gtest_main",
+    ],
+)

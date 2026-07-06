@@ -1,12 +1,12 @@
 #include "src/backend/cpu/cpu_backend.h"
 
 #include <cstring>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "src/backend/base/backend_factory.h"
 #include "src/backend/cpu/cpu_backend_context.h"
+#include "src/utils/strings.h"
 #include "src/utils/types.h"
 
 #define LOG_TAG "Atlas::CpuBackend"
@@ -60,9 +60,8 @@ utils::ErrorCode CpuBackend::Load(const std::string& model_path,
     int num_threads = kDefaultNumThreads;
     auto it = config.config.find(kConfigNumThreads);
     if (it != config.config.end()) {
-        try {
-            num_threads = std::stoi(it->second);
-        } catch (...) {
+        if (utils::Strings::ParseInt(it->second, &num_threads) !=
+            utils::ErrorCode::kOk) {
             num_threads = kDefaultNumThreads;
         }
     }
