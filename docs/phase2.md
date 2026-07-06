@@ -353,6 +353,7 @@ CpuBackend::Infer(inputs, outputs)
 |----------|------|------|------|
 | [Proposal-001](proposals/001-pipeline-manifest-config.md) | 2026-06-26 | Manifest 自由配置 Pipeline | 已采纳 |
 | [Proposal-002](proposals/002-snpe-backend.md) | 2026-06-26 | SNPE 后端接入 | 已采纳 |
+| [Proposal-009](proposals/009-backend-version-interface.md) | 2026-07-06 | IBackend 后端版本号接口 | 已采纳 |
 
 ---
 
@@ -366,3 +367,5 @@ CpuBackend::Infer(inputs, outputs)
 > **【补充】** Proposal-001 | 2026-06-26 | Manifest 自由配置 Pipeline，在清单文件中新增可选的 `pipeline` 字段，允许用户声明式定义预处理 / 后处理节点链；同时保留现有自动构建逻辑作为默认行为（向后兼容）。详细设计见 docs/proposals/001-pipeline-manifest-config.md。
 
 > **【补充】** Proposal-002 | 2026-06-26 | SNPE 后端接入，在阶段二建立的后端抽象层（IBackend / IBackendContext / BackendFactory）基础上新增 SnpeBackend + SnpeBackendContext，通过条件编译 + stub 降级方案实现跨平台兼容。详细设计见 docs/proposals/002-snpe-backend.md。
+
+> **【补充】** Proposal-009 | 2026-07-06 | IBackend 后端版本号接口，在 IBackend 新增纯虚函数 Version()，仅返回底层库版本号字符串。CpuBackend 通过 Ort::GetVersionString() 运行时获取 ONNX Runtime 版本，SnpeBackend v1/v2 通过 SNPEFactory::getLibraryVersion().toString() 运行时获取 SNPE SDK 版本，stub 返回固定字符串。详细设计见 docs/proposals/009-backend-version-interface.md。

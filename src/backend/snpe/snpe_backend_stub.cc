@@ -62,6 +62,10 @@ void SnpeBackend::Unload() {
 
 bool SnpeBackend::IsLoaded() const { return false; }
 
+std::string SnpeBackend::Version() const {
+    return "stub";
+}
+
 }  // namespace backend
 }  // namespace atlas
 

@@ -27,3 +27,4 @@ NNN-short-kebab-title.md
 | [006](006-model-config-public-api.md) | ModelHandle 暴露 ModelConfig 关键字段 | 已采纳 |
 | [007](007-third-party-dir-restructuring.md) | 三方库目录按类型分文件夹管理 | 已采纳 |
 | [008](008-logger-implementation.md) | 日志输出管理系统 | 已采纳 |
+| [009](009-backend-version-interface.md) | IBackend 后端独立版本号接口 | 已采纳 |

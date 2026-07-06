@@ -39,6 +39,7 @@ class SnpeBackend : public IBackend {
 
     void Unload()   override;
     bool IsLoaded() const override;
+    std::string Version() const override;
 
  private:
     // Reads input/output metadata from the loaded SNPE network into

@@ -236,6 +236,10 @@ void CpuBackend::Unload() {
 
 bool CpuBackend::IsLoaded() const { return loaded_; }
 
+std::string CpuBackend::Version() const {
+    return std::string(Ort::GetVersionString());
+}
+
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------

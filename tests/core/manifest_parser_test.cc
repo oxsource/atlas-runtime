@@ -269,6 +269,7 @@ class StubBackend : public backend::IBackend {
     std::vector<utils::TensorInfo> GetOutputInfo() const override { return {}; }
     void Unload() override { loaded_ = false; }
     bool IsLoaded() const override { return loaded_; }
+    std::string Version() const override { return "stub-stub/0.0.0"; }
 
  private:
     bool loaded_ = false;

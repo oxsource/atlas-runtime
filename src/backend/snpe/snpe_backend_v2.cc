@@ -427,6 +427,10 @@ void SnpeBackend::Unload() {
 
 bool SnpeBackend::IsLoaded() const { return loaded_; }
 
+std::string SnpeBackend::Version() const {
+    return std::string(SNPE::SNPEFactory::getLibraryVersion().toString());
+}
+
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------

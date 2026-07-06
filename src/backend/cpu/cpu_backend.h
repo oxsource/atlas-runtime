@@ -33,6 +33,7 @@ class CpuBackend : public IBackend {
 
     void Unload()   override;
     bool IsLoaded() const override;
+    std::string Version() const override;
 
  private:
     // Reads input/output metadata from the loaded session into

@@ -51,6 +51,10 @@ class IBackend {
     // Returns true if Load() completed successfully and Unload() has not been
     // called since.
     virtual bool IsLoaded() const = 0;
+
+    // Returns the backend library version string.
+    // Example: "1.17.3".
+    virtual std::string Version() const = 0;
 };
 
 }  // namespace backend
