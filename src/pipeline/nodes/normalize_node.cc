@@ -3,7 +3,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <sstream>
 #include <string>
 
 #include "src/pipeline/pipeline_node_factory.h"
@@ -64,17 +63,29 @@ utils::ErrorCode NormalizeNode::Process(const utils::Tensor& input,
 namespace {
 
 // Parses a comma-separated list of floats from |s| into |out|.
+// Uses C strtof instead of std::stringstream + std::stof to avoid
+// locale-dependent static initialization issues on Android.
+//
+// Platform note: std::stringstream constructs a std::locale internally,
+// whose static initialization may fail with std::bad_cast on Android NDK
+// due to undefined static initialization order across translation units.
+// C strtof has no such dependency and is portable across all platforms.
+//
 // Returns false on parse error.
 bool ParseFloatList(const std::string& s, std::vector<float>* out) {
     out->clear();
-    std::stringstream ss(s);
-    std::string token;
-    while (std::getline(ss, token, ',')) {
-        try {
-            out->push_back(std::stof(token));
-        } catch (...) {
-            return false;
-        }
+    if (s.empty()) return false;
+    const char* p = s.c_str();
+    const char* const end = p + s.size();
+    while (p < end) {
+        char* next = nullptr;
+        const float val = std::strtof(p, &next);
+        if (next == p) return false;  // no digits parsed
+        out->push_back(val);
+        p = next;
+        if (*p == ',') ++p;
+        // Skip any trailing whitespace after comma for robustness.
+        while (*p == ' ') ++p;
     }
     return !out->empty();
 }
