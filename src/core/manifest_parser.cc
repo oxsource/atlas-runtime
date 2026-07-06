@@ -1,8 +1,7 @@
 #include "src/core/manifest_parser.h"
 
+#include <cstdio>
 #include <cstdlib>
-#include <fstream>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -88,10 +87,15 @@ constexpr const char* kKeyParams           = "params";
 // ---------------------------------------------------------------------------
 
 // Splits a "major.minor" version string.  Returns false on malformed input.
+//
+// Uses std::sscanf instead of std::istringstream to avoid locale-related
+// static initialization issues on Android NDK. See BUG-003.
+//
+// Uses C stdio (fopen/fread) instead of std::ifstream for the same reason:
+// std::ifstream construction triggers locale initialization that may fail
+// on Android NDK at runtime. See BUG-003.
 bool ParseVersionString(const std::string& version, int* major, int* minor) {
-    std::istringstream ss(version);
-    char dot = 0;
-    return static_cast<bool>(ss >> *major >> dot >> *minor) && dot == '.';
+    return std::sscanf(version.c_str(), "%d.%d", major, minor) == 2;
 }
 
 // Maps a dtype string to the corresponding DataType enum value.
@@ -305,16 +309,33 @@ utils::ErrorCode ManifestParser::Parse(const std::string& path,
         return utils::ErrorCode::kInvalidArgument;
     }
 
-    std::ifstream file(path);
-    if (!file.is_open()) {
+    FILE* file = std::fopen(path.c_str(), "rb");
+    if (file == nullptr) {
         ATLAS_LOGE("failed to open file: %s", path.c_str());
         return utils::ErrorCode::kFileNotFound;
     }
     ATLAS_LOGD("file opened, parsing JSON");
 
+    // Read entire file into a string, then parse from string.
+    // Uses C stdio instead of std::ifstream to avoid locale-dependent
+    // runtime initialization issues on Android NDK. See BUG-003.
+    std::fseek(file, 0, SEEK_END);
+    const long file_size = std::ftell(file);
+    std::rewind(file);
+
+    std::string content(static_cast<size_t>(file_size), '\0');
+    const size_t read_bytes = std::fread(content.data(), 1,
+                                          static_cast<size_t>(file_size), file);
+    std::fclose(file);
+
+    if (static_cast<long>(read_bytes) != file_size) {
+        ATLAS_LOGE("failed to read file: %s", path.c_str());
+        return utils::ErrorCode::kFileNotFound;
+    }
+
     nlohmann::json j;
     try {
-        file >> j;
+        j = nlohmann::json::parse(content);
     } catch (const nlohmann::json::parse_error&) {
         ATLAS_LOGE("JSON parse error in: %s", path.c_str());
         return utils::ErrorCode::kParseError;

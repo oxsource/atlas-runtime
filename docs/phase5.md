@@ -647,3 +647,4 @@ const char* VersionString();
 | BUG | 日期 | 简述 | 等级 | 状态 |
 |-----|------|------|------|------|
 | [BUG-002](bugfixes/BUG-002-normalize-node-android-std-bad-cast.md) | 2026-07-06 | normalize_node Android platform std::stringstream static init throws std::bad_cast | P0 | 已修复 |
+| [BUG-003](bugfixes/BUG-003-manifest-parser-android-std-bad-cast.md) | 2026-07-06 | manifest_parser Android platform std::istringstream + std::ifstream locale init throws std::bad_cast | P0 | 已修复 |

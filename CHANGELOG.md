@@ -67,6 +67,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - BUG-001: Linux platform ONNX Runtime SONAME missing causes 5 test failures (P0)
 - BUG-002: normalize_node Android platform std::stringstream static init throws std::bad_cast (P0)
+- BUG-003: manifest_parser Android platform std::istringstream + std::ifstream locale init throws std::bad_cast (P0)
 
 ---
 

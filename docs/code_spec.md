@@ -255,7 +255,36 @@ ExpandEnvVars(&model_config.model_path);
 
 ---
 
-## 十一、规范检查工具
+## 十一、平台兼容性
+
+### 11.1 Android NDK locale 初始化限制
+
+Android NDK（libc++）环境中，`std::locale` 的静态初始化顺序在不同翻译单元之间是未定义的。
+在特定链接顺序下，访问尚未初始化的 locale facet 会导致 `std::bad_cast` 崩溃。
+
+**禁止使用的 STL 类型**（在可能运行于 Android 的代码中）：
+
+| 禁止类型 | 原因 | 替代方案 |
+|----------|------|----------|
+| `std::stringstream` / `std::istringstream` / `std::ostringstream` | 构造时触发 `std::locale` 初始化 | C 标准库：`std::strtof`、`std::sscanf`、`std::snprintf` |
+| `std::ifstream` / `std::ofstream` / `std::fstream` | 构造时在运行时初始化 `std::locale` | C stdio：`fopen` / `fread` / `fwrite` |
+| `std::stoi` / `std::stof` / `std::stod`（仅限静态初始化路径） | 实现路径可能触发 locale | `std::strtol` / `std::strtof` / `std::strtod` |
+
+**注意**：`std::stoi` 等在普通运行时调用一般安全，仅在静态初始化（如 `ATLAS_REGISTER_*` 宏中的 lambda）中需要警惕。但 `std::stringstream` / `std::ifstream` 无论在哪条路径都应避免。
+
+### 11.2 通用原则
+
+- 优先使用 C 标准库函数处理字符串解析和文件 I/O，以保障跨平台一致性
+- 静态初始化（static dynamic initialization）中避免任何可能触发 `std::locale` 的调用
+- 新增平台相关代码时，应在目标平台上进行编译和运行验证
+
+**相关参考**：
+- BUG-002: `docs/bugfixes/BUG-002-normalize-node-android-std-bad-cast.md`
+- BUG-003: `docs/bugfixes/BUG-003-manifest-parser-android-std-bad-cast.md`
+
+---
+
+## 十二、规范检查工具
 
 | 工具 | 用途 | 执行方式 |
 |------|------|----------|
