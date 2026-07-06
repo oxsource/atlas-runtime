@@ -2,10 +2,10 @@
 // Minimal Android native example that only emits logs.
 
 #include <cstdio>
+#include <string>
 
-#if defined(ATLAS_ANDROID_LOG_ENABLE_SNPE_VERSION)
-#include "SNPE/SNPEFactory.hpp"
-#endif
+#include "src/backend/snpe/snpe_backend_context.h"
+#include "src/backend/snpe/snpe_backend.h"
 
 #define LOG_TAG "android_log"
 #include "src/utils/logger.h"
@@ -14,10 +14,11 @@ int main(int argc, char* argv[]) {
     atlas::utils::Logger::SetLevel(atlas::utils::Logger::Level::Debug);
     ATLAS_LOGD("example started");
 
-#if defined(ATLAS_ANDROID_LOG_ENABLE_SNPE_VERSION)
-    const auto version = zdl::SNPE::SNPEFactory::getLibraryVersion();
-    ATLAS_LOGD("SNPE version: %s", version.toString().c_str());
-#endif
+    atlas::backend::SnpeBackendContext backend_context;
+    atlas::backend::SnpeBackend backend;
+    const std::string backend_version =
+        std::string(backend_context.BackendType()) + "-" + backend.Version();
+    ATLAS_LOGD("snpe backend version: %s", backend_version.c_str());
 
     ATLAS_LOGD("argc=%d", argc);
     for (int i = 0; i < argc; ++i) {

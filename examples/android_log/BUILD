@@ -7,10 +7,9 @@ cc_binary(
     # SNPE runtime's C++ ABI and stays consistent with the device toolchain.
     copts = [
         "-DATLAS_ENABLE_LOGGING",
-        "-DATLAS_ANDROID_LOG_ENABLE_SNPE_VERSION=1",
     ],
     deps = [
-        "@snpe_sdk//:snpe",
+        "//src/backend/snpe:snpe_backend",
         "//src/utils:logger",
     ],
 )
