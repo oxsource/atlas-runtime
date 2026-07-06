@@ -18,34 +18,17 @@ cc_library(
 
 cc_library(
     name = "nodes",
-    srcs = [
-        "nodes/bgr_to_rgb_node.cc",
-        "nodes/chw_to_hwc_node.cc",
-        "nodes/dtype_convert_node.cc",
-        "nodes/hwc_to_chw_node.cc",
-        "nodes/normalize_node.cc",
-        "nodes/resize_node.cc",
-        "nodes/rgb_to_bgr_node.cc",
-        "nodes/softmax_node.cc",
-        "nodes/topk_node.cc",
-    ],
-    hdrs = [
-        "nodes/bgr_to_rgb_node.h",
-        "nodes/chw_to_hwc_node.h",
-        "nodes/dtype_convert_node.h",
-        "nodes/hwc_to_chw_node.h",
-        "nodes/normalize_node.h",
-        "nodes/resize_node.h",
-        "nodes/rgb_to_bgr_node.h",
-        "nodes/softmax_node.h",
-        "nodes/topk_node.h",
-    ],
     deps = [
-        ":pipeline_node",
-        ":pipeline_node_factory",
-        "//src/utils:types",
+        "//src/pipeline/nodes:bgr_to_rgb_node",
+        "//src/pipeline/nodes:chw_to_hwc_node",
+        "//src/pipeline/nodes:dtype_convert_node",
+        "//src/pipeline/nodes:hwc_to_chw_node",
+        "//src/pipeline/nodes:normalize_node",
+        "//src/pipeline/nodes:resize_node",
+        "//src/pipeline/nodes:rgb_to_bgr_node",
+        "//src/pipeline/nodes:softmax_node",
+        "//src/pipeline/nodes:topk_node",
     ],
-    alwayslink = 1,
     visibility = ["//visibility:public"],
 )
 
