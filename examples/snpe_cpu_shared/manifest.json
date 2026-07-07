@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "name": "snpe-cpu-shared-comparison",
+  "models": [
+    {
+      "id": "relu_cpu",
+      "name": "ReLU Model (CPU Backend, ONNX)",
+      "backend": "cpu",
+      "model_path": "relu.onnx",
+      "load_strategy": "eager",
+      "inputs": [
+        {
+          "name": "images",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32",
+          "layout": "NCHW"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32"
+        }
+      ],
+      "config": { "num_threads": "1" }
+    },
+    {
+      "id": "relu_snpe",
+      "name": "ReLU Model (SNPE Backend, DLC)",
+      "backend": "snpe",
+      "model_path": "relu_snpe.dlc",
+      "load_strategy": "eager",
+      "inputs": [
+        {
+          "name": "images",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32",
+          "layout": "NCHW"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "shape": [1, 3, 4, 4],
+          "dtype": "float32"
+        }
+      ],
+      "config": {
+        "runtime": "cpu"
+      }
+    }
+  ]
+}
