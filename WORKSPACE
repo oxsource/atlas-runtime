@@ -1,4 +1,4 @@
-workspace(name = "atlas")
+workspace(name = "oxsource_atlas")
 
 load("//:atlas_deps.bzl", "atlas_setup")
 

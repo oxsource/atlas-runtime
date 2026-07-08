@@ -90,12 +90,12 @@ third_party/
 
 | 位置 | 原 Label | 新 Label |
 |------|----------|----------|
-| L31 nlohmann_json | `@atlas//third_party:nlohmann_json.BUILD` | `@atlas//third_party/nlohmann_json:nlohmann_json.BUILD` |
-| L40 onnxruntime_macos_arm64 | `@atlas//third_party:onnxruntime.BUILD` | `@atlas//third_party/onnxruntime:onnxruntime.BUILD` |
-| L49 onnxruntime_linux_x86_64 | `@atlas//third_party:onnxruntime.BUILD` | `@atlas//third_party/onnxruntime:onnxruntime.BUILD` |
-| L58 onnxruntime_linux_aarch64 | `@atlas//third_party:onnxruntime.BUILD` | `@atlas//third_party/onnxruntime:onnxruntime.BUILD` |
-| L70 onnxruntime_android_arm64 | `@atlas//third_party:onnxruntime_android_arm64.BUILD` | `@atlas//third_party/onnxruntime:onnxruntime_android_arm64.BUILD` |
-| L78 onnxruntime_android_x86_64 | `@atlas//third_party:onnxruntime_android_x86_64.BUILD` | `@atlas//third_party/onnxruntime:onnxruntime_android_x86_64.BUILD` |
+| L31 nlohmann_json | `@oxsource_atlas//third_party:nlohmann_json.BUILD` | `@oxsource_atlas//third_party/nlohmann_json:nlohmann_json.BUILD` |
+| L40 onnxruntime_macos_arm64 | `@oxsource_atlas//third_party:onnxruntime.BUILD` | `@oxsource_atlas//third_party/onnxruntime:onnxruntime.BUILD` |
+| L49 onnxruntime_linux_x86_64 | `@oxsource_atlas//third_party:onnxruntime.BUILD` | `@oxsource_atlas//third_party/onnxruntime:onnxruntime.BUILD` |
+| L58 onnxruntime_linux_aarch64 | `@oxsource_atlas//third_party:onnxruntime.BUILD` | `@oxsource_atlas//third_party/onnxruntime:onnxruntime.BUILD` |
+| L70 onnxruntime_android_arm64 | `@oxsource_atlas//third_party:onnxruntime_android_arm64.BUILD` | `@oxsource_atlas//third_party/onnxruntime:onnxruntime_android_arm64.BUILD` |
+| L78 onnxruntime_android_x86_64 | `@oxsource_atlas//third_party:onnxruntime_android_x86_64.BUILD` | `@oxsource_atlas//third_party/onnxruntime:onnxruntime_android_x86_64.BUILD` |
 
 ### 3.3 `third_party/BUILD` 包声明
 

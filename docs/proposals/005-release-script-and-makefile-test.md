@@ -10,7 +10,7 @@
 
 ### 1.1 现状
 
-阶段六已经实现了完整的公共 API 层和 Bazel 公共库目标（`//src/public:atlas`），并提供了 `tools/install_atlas.sh` 安装脚本和 `atlas.pc` pkg-config 模板。外部 Bazel 项目可以通过 `http_archive` 或 `local_repository` 引入 Atlas 并依赖 `@atlas//src/public:atlas`。
+阶段六已经实现了完整的公共 API 层和 Bazel 公共库目标（`//src/public:atlas`），并提供了 `tools/install_atlas.sh` 安装脚本和 `atlas.pc` pkg-config 模板。外部 Bazel 项目可以通过 `http_archive` 或 `local_repository` 引入 Atlas 并依赖 `@oxsource_atlas//src/public:atlas`。
 
 ### 1.2 存在问题
 

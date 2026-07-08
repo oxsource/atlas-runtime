@@ -467,7 +467,7 @@ cc_binary(
     name = "my_app",
     srcs = ["main.cc"],
     deps = [
-        "@atlas//src/public:atlas",
+        "@oxsource_atlas//src/public:atlas",
     ],
 )
 ```
@@ -491,7 +491,7 @@ Atlas 的 `WORKSPACE` 中声明的 `@onnxruntime_macos_arm64` / `@nlohmann_json`
 **方案 A（推荐）**：Atlas 提供一个 `atlas_deps.bzl` 宏，外部项目在 `WORKSPACE` 中调用 `atlas_setup()`：
 
 ```python
-load("@atlas//:atlas_deps.bzl", "atlas_setup")
+load("@oxsource_atlas//:atlas_deps.bzl", "atlas_setup")
 
 # 仅核心依赖（ONNX Runtime、nlohmann/json、googletest 等）
 atlas_setup()
@@ -537,12 +537,12 @@ def atlas_linkopts():
 
 外部项目使用：
 ```python
-load("@atlas//src/public:atlas.bzl", "atlas_linkopts")
+load("@oxsource_atlas//src/public:atlas.bzl", "atlas_linkopts")
 
 cc_binary(
     name = "my_app",
     srcs = ["main.cc"],
-    deps = ["@atlas//src/public:atlas"],
+    deps = ["@oxsource_atlas//src/public:atlas"],
     linkopts = atlas_linkopts(),
 )
 ```
@@ -793,7 +793,7 @@ atlas/
    - **建议**：内置分发，降低集成门槛；同时在文档中标注可替换为系统安装版本。
 
 5. **`atlas_deps.bzl` 是否随 release archive 提供**：外部项目通过 `http_archive` 引入 Atlas 时，`WORKSPACE` 中的 `http_archive` 声明是否应改为 `atlas_deps()` 调用？
-   - **建议**：提供 `atlas_deps.bzl`，外部项目 `WORKSPACE` 中 `load("@atlas//:atlas_deps.bzl", "atlas_deps")` + `atlas_deps()` 一行完成依赖拉取。
+   - **建议**：提供 `atlas_deps.bzl`，外部项目 `WORKSPACE` 中 `load("@oxsource_atlas//:atlas_deps.bzl", "atlas_deps")` + `atlas_deps()` 一行完成依赖拉取。
 
 6. **静态库是否在本阶段交付**：嵌入式场景可能需要 `libatlas.a`，但 Bazel 产出的静态库会包含三方库 `.o`，体积与许可需评估。
    - **建议**：本阶段仅交付共享库，静态库作为可选项在实现时验证可行性。

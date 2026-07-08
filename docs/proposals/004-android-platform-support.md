@@ -90,7 +90,7 @@ if not native.existing_rule("onnxruntime_android_arm64"):
         name = "onnxruntime_android_arm64",
         url = "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/1.17.3/onnxruntime-android-1.17.3.aar",
         sha256 = "790d962102a47b9ed3523912cd9a39a67590cd353ae55d88c5358be7b6945d79",
-        build_file = "@atlas//third_party:onnxruntime_android_arm64.BUILD",
+        build_file = "@oxsource_atlas//third_party:onnxruntime_android_arm64.BUILD",
     )
 
 if not native.existing_rule("onnxruntime_android_x86_64"):
@@ -98,7 +98,7 @@ if not native.existing_rule("onnxruntime_android_x86_64"):
         name = "onnxruntime_android_x86_64",
         url = "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/1.17.3/onnxruntime-android-1.17.3.aar",
         sha256 = "790d962102a47b9ed3523912cd9a39a67590cd353ae55d88c5358be7b6945d79",
-        build_file = "@atlas//third_party:onnxruntime_android_x86_64.BUILD",
+        build_file = "@oxsource_atlas//third_party:onnxruntime_android_x86_64.BUILD",
     )
 ```
 
@@ -140,7 +140,7 @@ cc_library(
 `rules_android_ndk` 已在 `atlas_deps()` 中通过 `http_archive` 拉取。外部项目在 `WORKSPACE` 中调用 `atlas_setup()` 后，需自行注册 NDK：
 
 ```starlark
-load("@atlas//:atlas_deps.bzl", "atlas_setup")
+load("@oxsource_atlas//:atlas_deps.bzl", "atlas_setup")
 atlas_setup()
 
 load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")

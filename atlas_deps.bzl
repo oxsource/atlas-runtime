@@ -11,7 +11,7 @@ Usage in external project's WORKSPACE:
         strip_prefix = "atlas-1.0.0",
     )
 
-    load("@atlas//:atlas_deps.bzl", "atlas_setup")
+    load("@oxsource_atlas//:atlas_deps.bzl", "atlas_setup")
     atlas_setup(snpe_major = "1")   # SNPE SDK (optional)
 
 For Android builds, additionally set up the NDK after atlas_setup():
@@ -25,7 +25,7 @@ GoogleTest) are fetched with the correct versions.
 """
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("@atlas//third_party/snpe:snpe_repo.bzl", "snpe_sdk_repo")
+load("@oxsource_atlas//third_party/snpe:snpe_repo.bzl", "snpe_sdk_repo")
 
 def _atlas_deps():
     """Fetches all third-party dependencies required by Atlas (internal)."""
@@ -35,7 +35,7 @@ def _atlas_deps():
             url = "https://github.com/nlohmann/json/archive/refs/tags/v3.11.3.tar.gz",
             sha256 = "0d8ef5af7f9794e3263480193c491549b2ba6cc74bb018906202ada498a79406",
             strip_prefix = "json-3.11.3",
-            build_file = "@atlas//third_party/nlohmann_json:nlohmann_json.BUILD",
+            build_file = "@oxsource_atlas//third_party/nlohmann_json:nlohmann_json.BUILD",
         )
 
     if not native.existing_rule("onnxruntime_macos_arm64"):
@@ -44,7 +44,7 @@ def _atlas_deps():
             url = "https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-osx-arm64-1.17.3.tgz",
             sha256 = "236c49c9065213b0ec9dec874e3619da3d01cbc8b984bb24291247293454d0f4",
             strip_prefix = "onnxruntime-osx-arm64-1.17.3",
-            build_file = "@atlas//third_party/onnxruntime:onnxruntime.BUILD",
+            build_file = "@oxsource_atlas//third_party/onnxruntime:onnxruntime.BUILD",
         )
 
     if not native.existing_rule("onnxruntime_linux_x86_64"):
@@ -53,7 +53,7 @@ def _atlas_deps():
             url = "https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-linux-x64-1.17.3.tgz",
             sha256 = "f2f11f9da1e3e19b22a8b378b9af57a58433f40e3db6a803e75c0ec0eba97a20",
             strip_prefix = "onnxruntime-linux-x64-1.17.3",
-            build_file = "@atlas//third_party/onnxruntime:onnxruntime.BUILD",
+            build_file = "@oxsource_atlas//third_party/onnxruntime:onnxruntime.BUILD",
         )
 
     if not native.existing_rule("onnxruntime_linux_aarch64"):
@@ -62,7 +62,7 @@ def _atlas_deps():
             url = "https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-linux-aarch64-1.17.3.tgz",
             sha256 = "9f801577bd99676d1d821022e52b1f4554f56339ae3606c7b5ff3155f443c921",
             strip_prefix = "onnxruntime-linux-aarch64-1.17.3",
-            build_file = "@atlas//third_party/onnxruntime:onnxruntime.BUILD",
+            build_file = "@oxsource_atlas//third_party/onnxruntime:onnxruntime.BUILD",
         )
 
     # Android AAR from Maven Central (contains arm64-v8a and x86_64 ABI .so files).
@@ -74,7 +74,7 @@ def _atlas_deps():
             name = "onnxruntime_android_arm64",
             url = "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/1.17.3/onnxruntime-android-1.17.3.aar",
             sha256 = "790d962102a47b9ed3523912cd9a39a67590cd353ae55d88c5358be7b6945d79",
-            build_file = "@atlas//third_party/onnxruntime:onnxruntime_android_arm64.BUILD",
+            build_file = "@oxsource_atlas//third_party/onnxruntime:onnxruntime_android_arm64.BUILD",
         )
 
     if not native.existing_rule("onnxruntime_android_x86_64"):
@@ -82,7 +82,7 @@ def _atlas_deps():
             name = "onnxruntime_android_x86_64",
             url = "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/1.17.3/onnxruntime-android-1.17.3.aar",
             sha256 = "790d962102a47b9ed3523912cd9a39a67590cd353ae55d88c5358be7b6945d79",
-            build_file = "@atlas//third_party/onnxruntime:onnxruntime_android_x86_64.BUILD",
+            build_file = "@oxsource_atlas//third_party/onnxruntime:onnxruntime_android_x86_64.BUILD",
         )
 
     # rules_android_ndk: external NDK rules that support NDK r25b+ with Bazel 6.5+.
@@ -151,7 +151,7 @@ def atlas_setup(snpe_major = None, snpe_sdk_path = None):
                      Falls back to the $SNPE_SDK_PATH environment variable.
 
     Example (external project WORKSPACE):
-      load("@atlas//:atlas_deps.bzl", "atlas_setup")
+      load("@oxsource_atlas//:atlas_deps.bzl", "atlas_setup")
       atlas_setup()                   # core deps only
       atlas_setup(snpe_major = "2")   # core deps + SNPE
     """
