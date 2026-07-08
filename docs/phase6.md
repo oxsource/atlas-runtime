@@ -450,8 +450,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 # Atlas  v1.0.0
 # ---------------------------------------------------------------------------
 http_archive(
-    name = "atlas",
-    url = "https://github.com/<org>/atlas/archive/refs/tags/v1.0.0.tar.gz",
+    name = "oxsource_atlas",
     sha256 = "<sha256-of-release-archive>",
     strip_prefix = "atlas-1.0.0",
 )
@@ -509,7 +508,7 @@ atlas_setup(snpe_major = "1")
 ```python
 # In external project's WORKSPACE
 local_repository(
-    name = "atlas",
+    name = "oxsource_atlas",
     path = "/path/to/atlas",
 )
 ```
@@ -546,6 +545,31 @@ cc_binary(
     linkopts = atlas_linkopts(),
 )
 ```
+
+### 6.4 `atlas_select()` 便捷宏
+
+对于需要按平台切换 `deps` / `linkopts` / `copts` 的场景，提供平台感知的 `select()` 封装：
+
+```python
+load("@oxsource_atlas//platforms:platforms.bzl", "atlas_select")
+
+# 按平台选择链接选项
+linkopts = atlas_select(
+    macos   = ["-Wl,-install_name,@rpath/libfoo.dylib"],
+    android = ["-Wl,-soname,libfoo.so"],
+    default = ["-Wl,-soname,libfoo.so",
+               "-Wl,--version-script=$(location version_script.lds)"],
+)
+
+# 按平台选择依赖
+deps = atlas_select(
+    android_arm64 = ["@onnxruntime_android//:onnxruntime"],
+    macos_arm64   = ["@onnxruntime_macos_arm64//:onnxruntime"],
+    default       = ["@onnxruntime_linux_x86_64//:onnxruntime"],
+)
+```
+
+支持分组回退：`macos_arm64` → `macos` → `default`，无需手动写 `@oxsource_atlas//platforms:*` 标签。
 
 ---
 
