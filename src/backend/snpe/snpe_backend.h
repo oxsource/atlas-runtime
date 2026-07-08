@@ -47,6 +47,9 @@ class SnpeBackend : public IBackend {
     // impl_->output_names.
     utils::ErrorCode BuildTensorInfos();
 
+    // Stored model config (used for builder.setOutputTensors()).
+    core::ModelConfig model_config_;
+
     // Non-owning pointer to the shared SNPE context (borrowed from ModelManager).
     SnpeBackendContext* active_ctx_ = nullptr;
 

@@ -204,6 +204,9 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
     ATLAS_LOGD("%s called, model_path=%s", __FUNCTION__, model_path.c_str());
     Unload();
 
+    // Store model config for builder.setOutputTensors().
+    model_config_ = config;
+
     // 1. Ensure shared context is initialized (idempotent).
     if (ctx != nullptr) {
         active_ctx_ = static_cast<SnpeBackendContext*>(ctx);
@@ -261,6 +264,17 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
     builder.setPerformanceProfile(perf_profile);
     builder.setUseUserSuppliedBuffers(use_buffer);
     builder.setPlatformConfig(platform_config);
+
+    // ── Tell SNPE which outputs to expose (manifest order preserved) ──
+    if (!model_config_.outputs.empty()) {
+        zdl::DlSystem::StringList out_names;
+        for (const auto& mo : model_config_.outputs) {
+            out_names.append(mo.name.c_str());
+        }
+        builder.setOutputTensors(out_names);
+        ATLAS_LOGD("setOutputTensors: %zu output(s) from manifest",
+                   model_config_.outputs.size());
+    }
 
     impl_->snpe = builder.build();
     if (impl_->snpe == nullptr) {
@@ -404,8 +418,13 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
         }
 
         const utils::TensorInfo& info = output_info_[i];
-        size_t elem_size  = utils::ElementByteSize(info.dtype);
-        size_t byte_size  = out_itensor->getSize() * elem_size;
+        // NOTE: SNPE ITensor::cbegin() always returns float* data,
+        // regardless of the internal quantization (TF8/INT8/kUInt8).
+        // The DLC runtime dequantizes internally before populating the
+        // ITensor. Therefore we must always allocate sizeof(float) per
+        // element. Using ElementByteSize(info.dtype) here is incorrect
+        // when dtype is kInt8 (size=1) because the actual data is float.
+        size_t byte_size  = out_itensor->getSize() * sizeof(float);
 
         utils::Tensor out;
         out.info      = info;
@@ -436,6 +455,7 @@ void SnpeBackend::Unload() {
     impl_->output_names.clear();
     input_info_.clear();
     output_info_.clear();
+    model_config_ = core::ModelConfig();
     active_ctx_ = nullptr;
     loaded_ = false;
 }
