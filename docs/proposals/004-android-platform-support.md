@@ -135,35 +135,20 @@ cc_library(
 )
 ```
 
-### 3.5 NDK 工具链（`atlas_deps.bzl`）
+### 3.5 NDK 工具链
+
+`rules_android_ndk` 已在 `atlas_deps()` 中通过 `http_archive` 拉取。外部项目在 `WORKSPACE` 中调用 `atlas_setup()` 后，需自行注册 NDK：
 
 ```starlark
-def atlas_android_setup():
-    """Configures Android NDK toolchain.
+load("@atlas//:atlas_deps.bzl", "atlas_setup")
+atlas_setup()
 
-    Must be called separately from atlas_deps() because android_ndk_repository
-    is a WORKSPACE rule, not a regular repository rule.
-    Requires ANDROID_NDK_HOME environment variable to be set,
-    or an explicit 'path' argument to be provided.
-
-    Recommended NDK: r25c or later (full C++17 support).
-    Minimum API level: 24 (first version with full 64-bit ABI support).
-    """
-    native.android_ndk_repository(
-        name = "androidndk",
-        api_level = 24,
-    )
+load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
+android_ndk_repository(name = "androidndk", api_level = 24)
+bind(name = "android/crosstool", actual = "@androidndk//:toolchain")
 ```
 
-外部项目 WORKSPACE 中调用：
-
-```starlark
-load("@atlas//:atlas_deps.bzl", "atlas_deps", "atlas_android_setup")
-atlas_deps()
-atlas_android_setup()  # 仅 Android 目标需要调用
-```
-
-> `android_ndk_repository` 是 WORKSPACE 内置规则，无法放入 `atlas_deps()` 的 `http_archive` 流程中，因此单独封装为 `atlas_android_setup()`。
+> 最初提案中设计了 `atlas_android_setup()` 宏，但实现时发现该宏实际为空（`rules_android_ndk` 已在 `atlas_deps()` 中拉取），且 `android_ndk_repository` 是 WORKSPACE 内置规则无法放入宏中，因此移除了该函数。统一入口改为 `atlas_setup()`。
 
 ### 3.6 `select()` 扩展
 
@@ -206,7 +191,7 @@ bazel build //src/public:atlas --config=android_arm64
 | 文件 | 变更类型 | 说明 |
 |------|----------|------|
 | `platforms/BUILD` | 修改 | 新增 `android_arm64`、`android_x86_64` |
-| `atlas_deps.bzl` | 修改 | 新增 `onnxruntime_android_arm64/x86_64`、`atlas_android_setup()` |
+| `atlas_deps.bzl` | 修改 | 新增 `onnxruntime_android_arm64/x86_64`；后重构为 `atlas_setup()` 统一入口，移除 `atlas_android_setup()` |
 | `third_party/onnxruntime_android_arm64.BUILD` | 新增 | arm64-v8a ABI 专属 BUILD |
 | `third_party/onnxruntime_android_x86_64.BUILD` | 新增 | x86_64 ABI 专属 BUILD |
 | `src/backend/cpu/BUILD` | 修改 | `select()` 新增 Android 分支（2 处） |

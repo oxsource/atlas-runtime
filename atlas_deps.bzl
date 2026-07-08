@@ -1,4 +1,4 @@
-"""Dependency bootstrap macro for external Bazel projects.
+"""Dependency bootstrap macros for external Bazel projects.
 
 Usage in external project's WORKSPACE:
 
@@ -11,17 +11,24 @@ Usage in external project's WORKSPACE:
         strip_prefix = "atlas-1.0.0",
     )
 
-    load("@atlas//:atlas_deps.bzl", "atlas_deps")
-    atlas_deps()
+    load("@atlas//:atlas_deps.bzl", "atlas_setup")
+    atlas_setup(snpe_major = "1")   # SNPE SDK (optional)
+
+For Android builds, additionally set up the NDK after atlas_setup():
+
+    load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
+    android_ndk_repository(name = "androidndk", api_level = 24)
+    bind(name = "android/crosstool", actual = "@androidndk//:toolchain")
 
 This ensures Atlas's transitive dependencies (ONNX Runtime, nlohmann/json,
 GoogleTest) are fetched with the correct versions.
 """
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@atlas//third_party/snpe:snpe_repo.bzl", "snpe_sdk_repo")
 
-def atlas_deps():
-    """Fetches all third-party dependencies required by Atlas."""
+def _atlas_deps():
+    """Fetches all third-party dependencies required by Atlas (internal)."""
     if not native.existing_rule("nlohmann_json"):
         http_archive(
             name = "nlohmann_json",
@@ -96,32 +103,58 @@ def atlas_deps():
             strip_prefix = "googletest-release-1.12.1",
         )
 
-def atlas_android_setup():
-    """Configures Android NDK toolchain via rules_android_ndk (supports NDK r25+).
+def _atlas_snpe_setup(snpe_major = "1", snpe_sdk_path = None):
+    """Configures the @snpe_sdk repository from a local SNPE SDK installation (internal).
 
-    Call this in addition to atlas_deps() when building Atlas for Android targets.
-    Requires ANDROID_NDK_HOME environment variable to point to the NDK root,
-    or set an explicit 'path' attribute.
+    Called automatically by atlas_setup() when snpe_major is provided.
 
-    This function uses rules_android_ndk (not the built-in android_ndk_repository)
-    which supports NDK r25b or later with Bazel 6.5+.
+    Call this in addition to atlas_deps() when building Atlas for platforms that
+    require the SNPE backend. When the SDK path is unavailable, @snpe_sdk will be
+    an empty repository and the SNPE backend compiles as a stub.
 
-    Prerequisites:
-      - Android NDK >= r25b; ANDROID_NDK_HOME must point to its root directory
-      - Minimum API level 24 (first version with full 64-bit ABI support)
+    Args:
+      snpe_major:   SNPE SDK major version ("1" or "2", default "1").
+      snpe_sdk_path: Absolute path to the SNPE SDK installation root. Falls back
+                     to the $SNPE_SDK_PATH environment variable when None/empty.
 
-    Note: After calling atlas_android_setup(), you must also call in WORKSPACE:
-      load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
-      android_ndk_repository(name = "androidndk", api_level = 24)
-      bind(name = "android/crosstool", actual = "@androidndk//:toolchain")
+    The SDK path resolution (attribute → env var → empty) is handled inside the
+    repository rule, so this macro is safe to call even when SNPE is not needed.
 
-    The bind() creates //external:android/crosstool which .bazelrc points to via
-    --crosstool_top=//external:android/crosstool for Android builds.
+    Example (delegated from atlas_setup):
+      atlas_setup(snpe_major = "2")
+    """
+    if not native.existing_rule("snpe_sdk"):
+        snpe_sdk_repo(
+            name = "snpe_sdk",
+            snpe_major = snpe_major,
+            snpe_sdk_path = snpe_sdk_path,
+        )
+
+def atlas_setup(snpe_major = None, snpe_sdk_path = None):
+    """Unified one-call setup for Atlas dependencies in external projects.
+
+    Always fetches core third-party deps (ONNX Runtime, nlohmann/json,
+    googletest, rules_android_ndk). Optionally configures the SNPE SDK
+    repository when ``snpe_major`` is provided.
+
+    For Android builds, after calling this macro you must also register the
+    NDK toolchain in WORKSPACE:
+
+        load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
+        android_ndk_repository(name = "androidndk", api_level = 24)
+        bind(name = "android/crosstool", actual = "@androidndk//:toolchain")
+
+    Args:
+      snpe_major:   SNPE SDK major version ("1" or "2"). When None (default),
+                    SNPE is skipped entirely.
+      snpe_sdk_path: Optional absolute path to the SNPE SDK installation root.
+                     Falls back to the $SNPE_SDK_PATH environment variable.
 
     Example (external project WORKSPACE):
-      load("@atlas//:atlas_deps.bzl", "atlas_deps")
-      atlas_deps()  # downloads rules_android_ndk
-      load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
-      android_ndk_repository(name = "androidndk", api_level = 24)
-      bind(name = "android/crosstool", actual = "@androidndk//:toolchain")
+      load("@atlas//:atlas_deps.bzl", "atlas_setup")
+      atlas_setup()                   # core deps only
+      atlas_setup(snpe_major = "2")   # core deps + SNPE
     """
+    _atlas_deps()
+    if snpe_major != None:
+        _atlas_snpe_setup(snpe_major = snpe_major, snpe_sdk_path = snpe_sdk_path)

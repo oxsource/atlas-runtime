@@ -488,15 +488,19 @@ int main() {
 
 Atlas 的 `WORKSPACE` 中声明的 `@onnxruntime_macos_arm64` / `@nlohmann_json` 不会自动传递给外部项目。有两种解决方案：
 
-**方案 A（推荐）**：Atlas 提供一个 `atlas_deps.bzl` 宏，外部项目在 `WORKSPACE` 中调用：
+**方案 A（推荐）**：Atlas 提供一个 `atlas_deps.bzl` 宏，外部项目在 `WORKSPACE` 中调用 `atlas_setup()`：
 
 ```python
-load("@atlas//:atlas_deps.bzl", "atlas_deps")
+load("@atlas//:atlas_deps.bzl", "atlas_setup")
 
-atlas_deps()
+# 仅核心依赖（ONNX Runtime、nlohmann/json、googletest 等）
+atlas_setup()
+
+# 包含 SNPE SDK（通过 snpe_major 控制版本）
+atlas_setup(snpe_major = "1")
 ```
 
-该宏内部执行 Atlas 所需的 `http_archive` 声明，确保依赖版本一致。
+该宏内部执行 Atlas 所需的 `http_archive` 声明，确保依赖版本一致。`atlas_deps()` 和 `atlas_snpe_setup()` 为内部函数（`_` 前缀），不对外暴露。
 
 **方案 B**：使用 Bazel 7.x 的 `bzlmod`（module 依赖管理），Atlas 发布为 Bazel Central Registry 模块。此方案更现代但要求升级 Bazel 版本，可作为后续优化。
 
