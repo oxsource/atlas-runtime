@@ -403,13 +403,10 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
         }
 
         const utils::TensorInfo& info = output_info_[i];
-        // NOTE: SNPE ITensor::cbegin() always returns float* data,
-        // regardless of the internal quantization (TF8/INT8/kUInt8).
-        // The DLC runtime dequantizes internally before populating the
-        // ITensor. Therefore we must always allocate sizeof(float) per
-        // element. Using ElementByteSize(info.dtype) here is incorrect
-        // when dtype is kInt8 (size=1) because the actual data is float.
-        size_t byte_size  = out_itensor->getSize() * sizeof(float);
+        // ElementByteSize is now consistent with info.dtype (manifest may
+        // have overridden it).  The calling code is responsible for ensuring
+        // the manifest dtype matches the actual SNPE output format (float).
+        size_t byte_size  = out_itensor->getSize() * ElementByteSize(info.dtype);
 
         utils::Tensor out;
         out.info      = info;
@@ -488,6 +485,15 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
             return utils::ErrorCode::kInferFailed;
         }
 
+        // Manifest config overrides (if present).
+        for (const auto& mi : model_config_.inputs) {
+            if (mi.name != name) continue;
+            if (!mi.shape.empty())  info.shape  = mi.shape;
+            if (!mi.layout.empty()) info.layout = mi.layout;
+            if (mi.dtype != utils::DataType::kUnknown) info.dtype = mi.dtype;
+            break;
+        }
+
         input_info_.push_back(std::move(info));
     }
 
@@ -511,6 +517,15 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
         if (info.dtype == utils::DataType::kUnknown) {
             ATLAS_LOGE("Unsupported output dtype for tensor: %s", name.c_str());
             return utils::ErrorCode::kInferFailed;
+        }
+
+        // Manifest config overrides (if present).
+        for (const auto& mo : model_config_.outputs) {
+            if (mo.name != name) continue;
+            if (!mo.shape.empty())  info.shape  = mo.shape;
+            if (!mo.layout.empty()) info.layout = mo.layout;
+            if (mo.dtype != utils::DataType::kUnknown) info.dtype = mo.dtype;
+            break;
         }
 
         output_info_.push_back(std::move(info));

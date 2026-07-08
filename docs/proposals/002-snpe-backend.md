@@ -800,9 +800,37 @@ SNPE `.dlc` 模型转换过程中可能内嵌标准化（mean/std）预处理。
 
 ---
 
-## 七、开发环境配置
+## 七、实现记录
 
-### 7.1 环境变量
+### 7.1 ManifestTensorInfo 覆盖 BuildTensorInfos 运行时推测值
+
+`BuildTensorInfos()` 中构建每个 input/output 的 `TensorInfo` 时，优先使用 DLC 运行时信息（shape/dtype/layout），然后遍历 `model_config_.inputs` / `model_config_.outputs` 查找同名条目——若 manifest 中对应的字段非空/非 unknown 则覆盖：
+
+```cpp
+// Manifest config overrides (if present).
+for (const auto& mi : model_config_.inputs) {
+    if (mi.name != name) continue;
+    if (!mi.shape.empty())  info.shape  = mi.shape;
+    if (!mi.layout.empty()) info.layout = mi.layout;
+    if (mi.dtype != utils::DataType::kUnknown) info.dtype = mi.dtype;
+    break;
+}
+```
+
+**对应代码**：`snpe_backend_v1.cc` / `snpe_backend_v2.cc` 的 `BuildTensorInfos()` 方法，inputs 和 outputs 各一处，共 4 处。
+
+**效果**：
+- `Infer()` 创建 ITensor 时使用覆盖后的 shape 值
+- `GetInputInfo()` / `GetOutputInfo()` 返回 manifest 覆盖后的 TensorInfo
+- 输出端 `byte_size` 计算使用 `ElementByteSize(info.dtype)` 而非硬编码 `sizeof(float)`
+
+> 注意：manifest 中指定的 dtype 需与 SNPE 实际输出格式一致；若不一致（如 DLC 输出 float 但 manifest 声明 int8），由用户负责。
+
+---
+
+## 八、开发环境配置
+
+### 8.1 环境变量
 
 在 shell 配置文件（`~/.bashrc`、`~/.zshrc`）中添加以下内容，根据目标 SNPE 版本取消对应注释：
 
@@ -815,7 +843,7 @@ source /opt/qcom/aistack/qairt/2.21.0.240401/bin/envsetup.sh
 
 # --- SNPE 1.x ---
 # 部分安装包可能存在 envsetup.sh 不可读/不可执行（权限受限）情况，
-# 建议直接使用手动变量方式（见 7.3 命令模板）。
+# 建议直接使用手动变量方式（见 8.3 命令模板）。
 # export SNPE_ROOT=/opt/qcom/sdk/snpe-1.50.0.2622
 
 export SNPE_SDK_PATH=$SNPE_ROOT
@@ -831,7 +859,7 @@ export ANDROID_NDK_HOME=/opt/local/usr/android/ndk/25.2.9519653
 > - `PATH`：SNPE 命令行工具（模型转换、量化等）所在目录
 > - `ANDROID_NDK_HOME`：交叉编译 Android arm64 目标所需的 NDK 路径
 
-### 7.2 Python 虚拟环境
+### 8.2 Python 虚拟环境
 
 推荐使用 [uv](https://docs.astral.sh/uv/) 管理 Python 版本和虚拟环境。SNPE 模型转换工具依赖特定版本的 Python 及以下包：
 
@@ -850,7 +878,7 @@ uv pip install packaging
 
 > `.venv/`、`.venv36`、`.venv38` 均已加入 `.gitignore`，不会被提交到版本控制。
 
-### 7.3 SNPE 1.x（1.50.0）验证命令（已实测）
+### 8.3 SNPE 1.x（1.50.0）验证命令（已实测）
 
 以下命令用于 Linux x86_64 主机验证 V1 端到端链路（构建 + 推理）：
 
