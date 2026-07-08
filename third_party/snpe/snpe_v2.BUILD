@@ -5,6 +5,8 @@
 #   Linux aarch64 .so: lib/aarch64-oe-linux-gcc8.2/libSNPE.so
 #   Android arm64 .so: lib/aarch64-android/libSNPE.so
 
+load("@oxsource_atlas//platforms:platforms.bzl", "atlas_select")
+
 cc_library(
     name = "snpe",
     hdrs = glob([
@@ -12,17 +14,11 @@ cc_library(
         "snpe_sdk_root/include/SNPE/**/*.h",
     ]),
     includes = ["snpe_sdk_root/include/SNPE"],
-    srcs = select({
-        "@//platforms:linux_aarch64": glob([
-            "snpe_sdk_root/lib/aarch64-oe-linux-gcc8.2/libSNPE.so",
-        ]),
-        "@//platforms:linux_x86_64": glob([
-            "snpe_sdk_root/lib/x86_64-linux-clang/libSNPE.so",
-        ]),
-        "@//platforms:android_arm64": glob([
-            "snpe_sdk_root/lib/aarch64-android/libSNPE.so",
-        ]),
-        "//conditions:default": [],
-    }),
+    srcs = atlas_select(
+        linux_aarch64 = glob(["snpe_sdk_root/lib/aarch64-oe-linux-gcc8.2/libSNPE.so"]),
+        linux_x86_64  = glob(["snpe_sdk_root/lib/x86_64-linux-clang/libSNPE.so"]),
+        android_arm64 = glob(["snpe_sdk_root/lib/aarch64-android/libSNPE.so"]),
+        default       = [],
+    ),
     visibility = ["//visibility:public"],
 )
