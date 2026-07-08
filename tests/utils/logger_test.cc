@@ -19,7 +19,7 @@ class LoggerTest : public ::testing::Test {
 };
 
 TEST_F(LoggerTest, MacrosCompile) {
-    // 验证四个级别的宏均可正常编译和调用
+    // Verify all 4 level macros compile and invoke
     ATLAS_LOGD("Debug message: %d", 42);
     ATLAS_LOGI("Info message: %s", "hello");
     ATLAS_LOGW("Warn message: %.2f", 3.14);
@@ -37,12 +37,12 @@ TEST_F(LoggerTest, InstanceMethods) {
 TEST_F(LoggerTest, LevelFiltering) {
     Logger logger("LevelTest");
 
-    // 设置为 Warn 级别，Debug 和 Info 应被过滤
+    // Set to Warn level; Debug and Info should be filtered
     Logger::SetLevel(Logger::Level::Warn);
     EXPECT_EQ(Logger::GetLevel(), Logger::Level::Warn);
 
-    // Debug 和 Info 低于 Warn，Sink 中会 return 而不输出
-    // 此处仅验证调用不崩溃
+    // Debug and Info are below Warn; Sink returns without output
+    // Only verifying no crash
     logger.Debug("should be filtered");
     logger.Info("should be filtered");
 
@@ -51,8 +51,8 @@ TEST_F(LoggerTest, LevelFiltering) {
 }
 
 TEST_F(LoggerTest, LevelToStr) {
-    // LevelToStr 为私有方法，通过输出格式间接验证
-    // 此处仅验证 SetLevel / GetLevel 一致性
+    // LevelToStr is private; verify via SetLevel/GetLevel consistency
+    // Only verifying SetLevel/GetLevel consistency
     Logger::SetLevel(Logger::Level::Debug);
     EXPECT_EQ(Logger::GetLevel(), Logger::Level::Debug);
 

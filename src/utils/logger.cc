@@ -10,7 +10,7 @@
 
 #define LOG_BUFFER_SIZE 1024
 
-// 格式化可变参数到栈缓冲区
+// Format variadic args into stack buffer
 #define FORMAT_MESSAGE(msgbuf, fmt) \
     char msgbuf[LOG_BUFFER_SIZE]; \
     va_list args; \
