@@ -23,6 +23,9 @@ __pycache__/
 # Atlas SDK build output
 atlas-sdk/
 
+# Example build output
+examples/**/build/
+
 # Environment and secrets
 .venv*/
 .env
