@@ -29,6 +29,7 @@ cc_library(
         "//src/core:manifest_parser",
         "//src/core:model_manager",
         "//src/pipeline:pipeline",
+        "//src/utils:logger",
         "//src/utils:types",
         "//src/utils:version",
     ] + onnxruntime_deps() + snpe_sdk_deps(),

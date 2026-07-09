@@ -5,6 +5,7 @@
 // headers as needed.
 
 #include "atlas/atlas_runtime.h"
+#include "atlas/logger.h"
 #include "atlas/model_handle.h"
 #include "atlas/types.h"
 #include "atlas/version.h"

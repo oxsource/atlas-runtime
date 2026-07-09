@@ -23,10 +23,8 @@
 #include <string>
 #include <vector>
 
-#include "atlas/atlas.h"
-
 #define LOG_TAG "snpe_cpu"
-#include "src/utils/logger.h"
+#include "atlas/atlas.h"
 
 namespace {
 

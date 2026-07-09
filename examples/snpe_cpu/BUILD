@@ -10,6 +10,5 @@ cc_binary(
     data = ["manifest.json"],
     deps = [
         "//src/public:atlas",
-        "//src/utils:logger",
     ],
 )
