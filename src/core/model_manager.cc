@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "src/backend/base/backend_factory.h"
+#include "src/backend/base/profiling_backend.h"
 #include "src/pipeline/pipeline.h"
 #include "src/utils/types.h"
 
@@ -49,6 +50,12 @@ utils::ErrorCode ModelManager::Init(const ManifestConfig& manifest) {
             ATLAS_LOGE("backend not found: %s", model.backend.c_str());
             ReleaseAll();
             return utils::ErrorCode::kBackendNotFound;
+        }
+
+        // Wrap with ProfilingBackend if profiling is enabled.
+        if (manifest.profile.enabled) {
+            backend_instance = std::make_unique<backend::ProfilingBackend>(
+                std::move(backend_instance), manifest.profile, model.id);
         }
 
         ModelEntry entry;

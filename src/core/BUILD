@@ -27,6 +27,7 @@ cc_library(
         "//src/backend/base:backend_factory",
         "//src/backend/base:i_backend",
         "//src/backend/base:i_backend_context",
+        "//src/backend/base:profiling_backend",
         "//src/pipeline:pipeline",
         "//src/utils:logger",
         "//src/utils:types",

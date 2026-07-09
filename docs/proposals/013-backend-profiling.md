@@ -149,18 +149,18 @@ class ProfilingBackend : public IBackend {
        std::string model_id;
        std::string phase;       // "load" / "infer" / "unload"
        std::string step;        // 子步骤名称
-       int64_t     duration_us; // 耗时（微秒）
-       int64_t     timestamp;   // 采集时间戳
+       double      duration_ms; // 耗时（毫秒，支持小数保留子毫秒精度）
+       int64_t     timestamp;   // 采集时间戳（Unix 毫秒）
    };
    ```
 3. **输出格式**（CSV，易于后续分析）：
    ```csv
-   model_id,phase,step,duration_us,timestamp
-   face_detection,load,container_open,15234,1720500000000
-   face_detection,load,build_tensor_info,892,1720500000015
-   face_detection,infer,input_copy,1234,1720500001000
-   face_detection,infer,execute,45678,1720500001023
-   face_detection,infer,output_wrap,56,1720500001079
+   model_id,phase,step,duration_ms,timestamp
+   face_detection,load,container_open,15.234,1720500000000
+   face_detection,load,build_tensor_info,0.892,1720500000015
+   face_detection,infer,input_copy,1.234,1720500001000
+   face_detection,infer,execute,45.678,1720500001023
+   face_detection,infer,output_wrap,0.056,1720500001079
    ```
 4. **刷新策略**：
    - 每条 `Infer()` 结束时立即写入（实时性要求高的场景）
@@ -229,7 +229,7 @@ std::unique_ptr<IBackend> BackendFactory::Create(
    - 关闭 profiling 时确认零额外开销（`ProfilingBackend` 不参与调用的概率）
 
 3. **性能影响验证**：
-   - 开启 profiling 后单次 `Infer()` 额外耗时 < 10μs（计时 + 写文件缓冲）
+   - 开启 profiling 后单次 `Infer()` 额外耗时 < 0.01ms（计时 + 写文件缓冲）
    - 关闭 profiling 时性能零损失
 
 ---

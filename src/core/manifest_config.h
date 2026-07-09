@@ -9,6 +9,19 @@
 namespace atlas {
 namespace core {
 
+// Profiling configuration parsed from the top-level "profile" section of the
+// manifest.  All models share the same profiling settings.
+struct ProfileConfig {
+    bool        enabled     = false;
+    std::string output_path;           // Empty → stdout.
+    std::string modules     = "load,infer";  // Comma-separated: load,infer,unload,all
+};
+
+inline bool ProfileModulesContain(const std::string& modules,
+                                   const std::string& phase) {
+    return modules == "all" || modules.find(phase) != std::string::npos;
+}
+
 // Model loading strategy declared in the manifest.
 enum class LoadStrategy {
     kEager = 0,  // Load at ModelManager::Init() time (default).
@@ -69,6 +82,7 @@ struct ModelConfig {
 struct ManifestConfig {
     std::string version;
     std::string name;
+    ProfileConfig    profile;
     std::vector<ModelConfig> models;
 
     // Returns a pointer to the model with the given id, or nullptr if not found.

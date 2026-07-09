@@ -55,6 +55,7 @@ constexpr char             kEnvVarClose = '}';
 constexpr const char* kKeyVersion = "version";
 constexpr const char* kKeyName    = "name";
 constexpr const char* kKeyModels  = "models";
+constexpr const char* kKeyProfile = "profile";
 
 // Model-level keys
 constexpr const char* kKeyId           = "id";
@@ -81,6 +82,11 @@ constexpr const char* kKeyStd       = "std";
 constexpr const char* kKeyPipeline         = "pipeline";
 constexpr const char* kKeyDisablePipeline  = "disable_pipeline";
 constexpr const char* kKeyParams           = "params";
+
+// Profile-level keys (top-level "profile" section).
+constexpr const char* kKeyProfileEnabled   = "enabled";
+constexpr const char* kKeyProfileOutput    = "output_path";
+constexpr const char* kKeyProfileModules   = "modules";
 
 // ---------------------------------------------------------------------------
 // Helper functions
@@ -368,6 +374,29 @@ utils::ErrorCode ManifestParser::Parse(const std::string& path,
     }
     config->name = j[kKeyName].get<std::string>();
     ATLAS_LOGD("manifest name: %s", config->name.c_str());
+
+    // Parse optional top-level "profile" section.
+    if (j.contains(kKeyProfile) && j[kKeyProfile].is_object()) {
+        const auto& p = j[kKeyProfile];
+        if (p.contains(kKeyProfileEnabled)) {
+            if (p[kKeyProfileEnabled].is_boolean()) {
+                config->profile.enabled = p[kKeyProfileEnabled].get<bool>();
+            } else if (p[kKeyProfileEnabled].is_string()) {
+                config->profile.enabled =
+                    p[kKeyProfileEnabled].get<std::string>() == "true";
+            }
+        }
+        if (p.contains(kKeyProfileOutput) && p[kKeyProfileOutput].is_string()) {
+            config->profile.output_path = p[kKeyProfileOutput].get<std::string>();
+        }
+        if (p.contains(kKeyProfileModules) && p[kKeyProfileModules].is_string()) {
+            config->profile.modules = p[kKeyProfileModules].get<std::string>();
+        }
+        ATLAS_LOGD("profile: enabled=%d, output=%s, modules=%s",
+                   static_cast<int>(config->profile.enabled),
+                   config->profile.output_path.c_str(),
+                   config->profile.modules.c_str());
+    }
 
     // Validate models array is present and non-empty.
     if (!j.contains(kKeyModels) || !j[kKeyModels].is_array() ||

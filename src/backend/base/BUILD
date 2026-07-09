@@ -26,3 +26,16 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "profiling_backend",
+    srcs = ["profiling_backend.cc"],
+    hdrs = ["profiling_backend.h"],
+    deps = [
+        ":i_backend",
+        "//src/core:manifest_config",
+        "//src/utils:logger",
+        "//src/utils:types",
+    ],
+    visibility = ["//visibility:public"],
+)
