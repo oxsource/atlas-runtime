@@ -37,6 +37,11 @@ struct SnpeBackend::SnpeImpl {
     std::unique_ptr<zdl::SNPE::SNPE>                snpe;
     std::vector<std::string>                        input_names;
     std::vector<std::string>                        output_names;
+    // Pre-allocated input ITensors (created once in Load(), reused in Infer()).
+    std::vector<std::unique_ptr<zdl::DlSystem::ITensor>> input_tensors;
+    // Output TensorMap lives here (zero-copy: returned pointers stay valid
+    // until the next Infer() call overwrites them).
+    zdl::DlSystem::TensorMap                             output_map;
 };
 
 namespace {
@@ -50,7 +55,6 @@ constexpr char kConfigUseBuffer[]  = "use_buffer";
 constexpr char kRuntimeCpu[] = "cpu";
 constexpr char kRuntimeGpu[] = "gpu";
 constexpr char kRuntimeDsp[] = "dsp";
-constexpr char kRuntimeAip[] = "aip";
 
 // Performance profile name strings — 1.50.0 subset
 // (LOW_BALANCED is the last; no EXTREME_POWER_SAVER in 1.x).
@@ -126,20 +130,15 @@ utils::DataType ParseDataType(
 
 int ParseRuntime(const std::string& runtime_str) {
     if (runtime_str == kRuntimeCpu) {
-        return static_cast<int>(zdl::DlSystem::Runtime_t::CPU_FLOAT32);
+        return static_cast<int>(zdl::DlSystem::Runtime_t::CPU);
     }
     if (runtime_str == kRuntimeGpu) {
-        return static_cast<int>(
-            zdl::DlSystem::Runtime_t::GPU_FLOAT32_16_HYBRID);
+        return static_cast<int>(zdl::DlSystem::Runtime_t::GPU);
     }
     if (runtime_str == kRuntimeDsp) {
-        return static_cast<int>(zdl::DlSystem::Runtime_t::DSP_FIXED8_TF);
+        return static_cast<int>(zdl::DlSystem::Runtime_t::DSP);
     }
-    if (runtime_str == kRuntimeAip) {
-        return static_cast<int>(zdl::DlSystem::Runtime_t::AIP_FIXED8_TF);
-    }
-    return static_cast<int>(
-        zdl::DlSystem::Runtime_t::GPU_FLOAT32_16_HYBRID);
+    return static_cast<int>(zdl::DlSystem::Runtime_t::GPU);
 }
 
 int ParsePerformanceProfile(const std::string& profile_str) {
@@ -219,7 +218,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
 
     // 2. Extract per-model parameters from config.
     zdl::DlSystem::Runtime_t runtime =
-        zdl::DlSystem::Runtime_t::GPU_FLOAT32_16_HYBRID;
+        zdl::DlSystem::Runtime_t::GPU;
     {
         auto it = config.config.find(kConfigRuntime);
         if (it != config.config.end()) {
@@ -228,7 +227,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
         }
     }
 
-    auto perf_profile = zdl::DlSystem::PerformanceProfile_t::BALANCED;
+    auto perf_profile = zdl::DlSystem::PerformanceProfile_t::HIGH_PERFORMANCE;
     {
         auto it = config.config.find(kConfigPerfProfile);
         if (it != config.config.end()) {
@@ -256,6 +255,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
     // 4. Build the runtime list and construct the SNPE network.
     zdl::DlSystem::RuntimeList runtime_list;
     runtime_list.add(runtime);
+    runtime_list.add(zdl::DlSystem::Runtime_t::CPU);
 
     zdl::DlSystem::PlatformConfig platform_config;
 
@@ -264,6 +264,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
     builder.setPerformanceProfile(perf_profile);
     builder.setUseUserSuppliedBuffers(use_buffer);
     builder.setPlatformConfig(platform_config);
+    builder.setCPUFallbackMode(false);
 
     // ── Tell SNPE which outputs to expose (manifest order preserved) ──
     if (!model_config_.outputs.empty()) {
@@ -319,6 +320,29 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
         return ret;
     }
 
+    // 7. Pre-allocate input ITensors (fixed shape, reused across Infer calls).
+    {
+        auto& tensor_factory = zdl::SNPE::SNPEFactory::getTensorFactory();
+        impl_->input_tensors.clear();
+        impl_->input_tensors.reserve(input_info_.size());
+        for (size_t i = 0; i < input_info_.size(); ++i) {
+            const utils::TensorInfo& info = input_info_[i];
+            std::vector<size_t> shape;
+            shape.reserve(info.shape.size());
+            for (int d : info.shape) {
+                shape.push_back(static_cast<size_t>(d > 0 ? d : 1));
+            }
+            zdl::DlSystem::TensorShape tensor_shape(shape);
+            auto itensor = tensor_factory.createTensor(tensor_shape);
+            if (itensor == nullptr) {
+                ATLAS_LOGE("Failed to pre-allocate input ITensor[%zu]", i);
+                Unload();
+                return utils::ErrorCode::kInferFailed;
+            }
+            impl_->input_tensors.push_back(std::move(itensor));
+        }
+    }
+
     loaded_ = true;
     return utils::ErrorCode::kOk;
 }
@@ -336,33 +360,18 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
         return utils::ErrorCode::kInvalidArgument;
     }
 
-    auto& tensor_factory = zdl::SNPE::SNPEFactory::getTensorFactory();
-
+    // ──────────────────────────────────────────────────────────────
+    // Step 1: Copy input data into pre-allocated ITensors.
+    // ──────────────────────────────────────────────────────────────
     zdl::DlSystem::TensorMap input_map;
-    std::vector<std::unique_ptr<zdl::DlSystem::ITensor>> input_tensors;
-    input_tensors.reserve(inputs.size());
     for (size_t i = 0; i < inputs.size(); ++i) {
         const utils::Tensor& t = inputs[i];
         const utils::TensorInfo& info = input_info_[i];
+        auto* itensor = impl_->input_tensors[i].get();
 
-        std::vector<size_t> shape;
-        shape.reserve(info.shape.size());
-        for (int d : info.shape) {
-            shape.push_back(static_cast<size_t>(d > 0 ? d : 1));
-        }
-
-        zdl::DlSystem::TensorShape tensor_shape(shape);
-        std::unique_ptr<zdl::DlSystem::ITensor> itensor;
         if (info.dtype == utils::DataType::kFloat32 &&
             t.data != nullptr &&
             t.byte_size % sizeof(float) == 0) {
-            itensor = tensor_factory.createTensor(tensor_shape);
-            if (itensor == nullptr) {
-                ATLAS_LOGE("Failed to create input ITensor[%zu]: %s", i,
-                           impl_->input_names[i].c_str());
-                return utils::ErrorCode::kInferFailed;
-            }
-
             const float* input_data = static_cast<const float*>(t.data);
             const size_t input_count = t.byte_size / sizeof(float);
             if (itensor->getSize() < input_count) {
@@ -373,24 +382,17 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
             }
             std::copy(input_data, input_data + input_count, itensor->begin());
         } else {
-            itensor = tensor_factory.createTensor(
-                tensor_shape,
-                static_cast<const unsigned char*>(t.data),
-                t.byte_size);
-        }
-        if (itensor == nullptr) {
-            ATLAS_LOGE("Failed to create input ITensor[%zu]: %s", i,
-                       impl_->input_names[i].c_str());
-            return utils::ErrorCode::kInferFailed;
+            std::memcpy(&(*itensor->begin()), t.data, t.byte_size);
         }
 
         if (inputs.size() > 1) {
-            input_map.add(impl_->input_names[i].c_str(), itensor.get());
+            input_map.add(impl_->input_names[i].c_str(), itensor);
         }
-        input_tensors.push_back(std::move(itensor));
     }
 
-    zdl::DlSystem::TensorMap output_map;
+    // ──────────────────────────────────────────────────────────────
+    // Step 2: Execute (output goes into impl_->output_map for zero-copy).
+    // ──────────────────────────────────────────────────────────────
     if (output_info_.size() != impl_->output_names.size()) {
         ATLAS_LOGE("Output metadata mismatch: expected %zu infos, got %zu names",
                    output_info_.size(), impl_->output_names.size());
@@ -399,18 +401,22 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
 
     const bool execute_ok =
         inputs.size() == 1
-            ? impl_->snpe->execute(input_tensors[0].get(), output_map)
-            : impl_->snpe->execute(input_map, output_map);
+            ? impl_->snpe->execute(impl_->input_tensors[0].get(), impl_->output_map)
+            : impl_->snpe->execute(input_map, impl_->output_map);
     if (!execute_ok) {
         ATLAS_LOGE("SNPE execute failed");
         return utils::ErrorCode::kInferFailed;
     }
 
+    // ──────────────────────────────────────────────────────────────
+    // Step 3: Wrap output tensors (zero-copy, pointers into output_map).
+    // Caller must consume outputs before the next Infer() call.
+    // ──────────────────────────────────────────────────────────────
     outputs.clear();
     outputs.reserve(impl_->output_names.size());
     for (size_t i = 0; i < impl_->output_names.size(); ++i) {
         zdl::DlSystem::ITensor* out_itensor =
-            output_map.getTensor(impl_->output_names[i].c_str());
+            impl_->output_map.getTensor(impl_->output_names[i].c_str());
         if (out_itensor == nullptr) {
             ATLAS_LOGE("Failed to get output tensor[%zu]: %s", i,
                        impl_->output_names[i].c_str());
@@ -418,19 +424,12 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
         }
 
         const utils::TensorInfo& info = output_info_[i];
-        // ElementByteSize is now consistent with info.dtype (manifest may
-        // have overridden it).  The calling code is responsible for ensuring
-        // the manifest dtype matches the actual SNPE output format (float).
-        size_t byte_size  = out_itensor->getSize() * ElementByteSize(info.dtype);
-
+        auto raw_ptr = out_itensor->cbegin();
         utils::Tensor out;
         out.info      = info;
-        out.byte_size = byte_size;
-        out.data      = malloc(byte_size);
-        out.owns_data = true;
-
-        auto raw_ptr = out_itensor->cbegin();
-        std::memcpy(out.data, &(*raw_ptr), byte_size);
+        out.byte_size = out_itensor->getSize() * ElementByteSize(info.dtype);
+        out.data      = const_cast<void*>(static_cast<const void*>(&(*raw_ptr)));
+        out.owns_data = false;
         outputs.push_back(std::move(out));
     }
 
@@ -450,6 +449,7 @@ void SnpeBackend::Unload() {
     impl_->container.reset();
     impl_->input_names.clear();
     impl_->output_names.clear();
+    impl_->input_tensors.clear();
     input_info_.clear();
     output_info_.clear();
     model_config_ = core::ModelConfig();
