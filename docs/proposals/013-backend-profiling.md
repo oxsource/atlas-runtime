@@ -44,53 +44,39 @@ ModelManager
 
 ### 2.2 Manifest 配置
 
-在 `ModelConfig::config`（`unordered_map<string, string>`）新增以下 Key，或支持在 manifest 顶层添加统一 profiling 配置：
-
-#### 方式 A：模型级配置（推荐，与现有架构一致）
+在 manifest JSON 根层级新增 `"profile"` 节，所有模型共享同一 profile 配置：
 
 ```json
 {
+  "profile": {
+    "enabled": "true",
+    "output_path": "/data/logs/atlas_profile.csv",
+    "modules": "load,infer"
+  },
   "models": [
     {
       "id": "face_detection",
       "backend": "snpe",
       "model_path": "models/face_detection.dlc",
       "config": {
-        "runtime": "dsp",
-        "profile_enabled": "true",
-        "profile_output_path": "/data/logs/atlas_profile.csv",
-        "profile_modules": "load,infer"
+        "runtime": "dsp"
       }
     }
   ]
 }
 ```
 
-#### 方式 B：全局 profiling 配置（可选，用于统一管理所有模型）
-
-```json
-{
-  "profile": {
-    "enabled": true,
-    "output_path": "/data/logs/atlas_profile.csv",
-    "models": ["face_detection", "landmarks"],
-    "modules": "load,infer,unload"
-  },
-  "models": [
-    ...
-  ]
-}
-```
-
-优先采用**方式 A**，与现有设计一致（后端专属配置已通过 `config` 传递），同时在 `ManifestConfig` 顶部预留**可选的全局 profiling 节**作为补充。如果模型级和全局配置冲突，模型级优先级更高。
+**不采用模型级配置**的原因：
+- profiling 是基础设施层的全局开关，不应混入单个模型的业务配置项（`runtime`、`use_buffer` 等）
+- 与 MediaPipe 风格一致 — `CalculatorGraphConfig` 顶层设置 `enable_profiler`，而非在每个 `Calculator` 中单独配置
 
 ### 2.3 配置字段定义
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `profile_enabled` | bool | `false` | 是否开启 profiling |
-| `profile_output_path` | string | `""`（stdout） | 统计结果输出文件路径；为空时输出到控制台 |
-| `profile_modules` | string | `"load,infer"` | 要统计的阶段，逗号分隔；可选值：`load`、`infer`、`unload`、`all` |
+| `enabled` | bool | `false` | 是否开启 profiling |
+| `output_path` | string | `""`（stdout） | 统计结果输出文件路径；为空时输出到控制台 |
+| `modules` | string | `"load,infer"` | 要统计的阶段，逗号分隔；可选值：`load`、`infer`、`unload`、`all` |
 
 ### 2.4 Profiling 计时点
 
@@ -183,24 +169,27 @@ class ProfilingBackend : public IBackend {
 
 ### 2.6 BackendFactory 集成
 
-`BackendFactory::Create()` 增加 profiling 包装逻辑：
+`BackendFactory::Create()` 增加可选的 `ProfileConfig` 参数，由 `ModelManager` 从解析后的 manifest 顶层 `"profile"` 节传入：
 
 ```cpp
-std::unique_ptr<IBackend> BackendFactory::Create(
-    const std::string& name, const core::ModelConfig& config) {
-    auto backend = CreateBackend(name);
-    if (!backend) return nullptr;
-
-    auto it = config.config.find("profile_enabled");
-    if (it != config.config.end() && it->second == "true") {
-        backend = std::make_unique<ProfilingBackend>(std::move(backend),
-                                                      ParseProfileConfig(config));
-    }
-    return backend;
+// ModelManager 中加载模型时
+auto backend = BackendFactory::Create(model_config.backend,
+                                      model_config);
+if (manifest_config.profile && manifest_config.profile->enabled) {
+    backend = std::make_unique<ProfilingBackend>(
+        std::move(backend), *manifest_config.profile);
 }
 ```
 
-无需修改 `ModelManager` 或下游调用方。
+```cpp
+// BackendFactory 接口调整（可选，也可在 ModelManager 层面包装）
+std::unique_ptr<IBackend> BackendFactory::Create(
+    const std::string& name,
+    const core::ModelConfig& model_config,
+    const core::ProfileConfig* profile_config = nullptr);
+```
+
+推荐在 **`ModelManager` 层面包装**，避免污染 `BackendFactory` 的职责边界。
 
 ### 2.7 与外部基准测试工具的关系
 
@@ -222,10 +211,10 @@ std::unique_ptr<IBackend> BackendFactory::Create(
 |------|------|
 | `src/backend/base/profiling_backend.h` | **新建**：`ProfilingBackend` 装饰器类声明 |
 | `src/backend/base/profiling_backend.cc` | **新建**：`ProfilingBackend` 实现，含计时、记录、CSV 输出 |
-| `src/backend/base/backend_factory.h` | 新增 `ParseProfileConfig()` 声明（可选） |
-| `src/backend/base/backend_factory.cc` | `Create()` 中检测 `profile_enabled` 配置，条件性包装 `ProfilingBackend` |
-| `src/core/manifest_config.h` | 新增 `ProfileConfig` 结构体（可选，或解析 inline 在 factory 中） |
-| `manifest/` | 更新示例 manifest 添加 profiling 配置（可选） |
+| `src/core/manifest_config.h` | **新增**：`ProfileConfig` 结构体，在 `ManifestConfig` 中添加 `std::optional<ProfileConfig> profile` |
+| `src/core/manifest_config.cc` | **修改**：解析 manifest 顶层 `"profile"` 节，填充 `ProfileConfig` |
+| `src/core/model_manager.cc` | **修改**：创建 backend 后检查 `profile.enabled`，条件性包装 `ProfilingBackend` |
+| `manifest/` | 更新示例 manifest 添加 `"profile"` 配置节 |
 
 ---
 
