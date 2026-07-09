@@ -42,6 +42,8 @@ class ProfilingBackend : public IBackend {
     void Unload() override;
     std::vector<utils::TensorInfo> GetInputInfo() const override;
     std::vector<utils::TensorInfo> GetOutputInfo() const override;
+    utils::Span<void> GetInputBuffer(size_t index) const override;
+    utils::Span<void> GetOutputBuffer(size_t index) const override;
     bool IsLoaded() const override;
     std::string Version() const override;
 

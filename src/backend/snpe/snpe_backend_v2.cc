@@ -348,13 +348,21 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
     }
 
     // ──────────────────────────────────────────────────────────────
-    // Step 1: Copy input data into pre-allocated ITensors.
+    // Step 1: Copy input data into pre-allocated ITensors (unless
+    //         the caller already wrote directly into the ITensor
+    //         via GetInputBuffer() — skip in that case).
     // ──────────────────────────────────────────────────────────────
     DlSystem::TensorMap input_map;
     for (size_t i = 0; i < inputs.size(); ++i) {
         const utils::Tensor& t = inputs[i];
         const utils::TensorInfo& info = input_info_[i];
         auto* itensor = impl_->input_tensors[i].get();
+
+        // When input data already points into the ITensor buffer,
+        // the caller pre-filled via GetInputBuffer() — no copy needed.
+        if (t.data == GetInputBuffer(i).data) {
+            goto add_to_map;
+        }
 
         if (info.dtype == utils::DataType::kFloat32 &&
             t.data != nullptr &&
@@ -372,6 +380,7 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
             std::memcpy(&(*itensor->begin()), t.data, t.byte_size);
         }
 
+    add_to_map:
         if (inputs.size() > 1) {
             input_map.add(impl_->input_names[i].c_str(), itensor);
         }
@@ -453,6 +462,32 @@ std::string SnpeBackend::Version() const {
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
+
+utils::Span<void> SnpeBackend::GetInputBuffer(size_t index) const {
+    if (!loaded_ || index >= impl_->input_tensors.size()) {
+        return {};
+    }
+    auto* itensor = impl_->input_tensors[index].get();
+    auto raw = itensor->begin();
+    return utils::Span<void>(
+        static_cast<void*>(&(*raw)),  // float* → void*, one step
+        itensor->getSize() * sizeof(float));
+}
+
+utils::Span<void> SnpeBackend::GetOutputBuffer(size_t index) const {
+    if (!loaded_ || index >= impl_->output_names.size()) {
+        return {};
+    }
+    DlSystem::ITensor* out_itensor =
+        impl_->output_map.getTensor(impl_->output_names[index].c_str());
+    if (out_itensor == nullptr) {
+        return {};
+    }
+    auto raw_ptr = out_itensor->cbegin();
+    return utils::Span<void>(
+        const_cast<void*>(static_cast<const void*>(&(*raw_ptr))),
+        out_itensor->getSize() * sizeof(float));
+}
 
 utils::ErrorCode SnpeBackend::BuildTensorInfos() {
     ATLAS_LOGD("%s called", __FUNCTION__);

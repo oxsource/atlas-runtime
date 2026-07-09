@@ -62,6 +62,16 @@ void SnpeBackend::Unload() {
 
 bool SnpeBackend::IsLoaded() const { return false; }
 
+utils::Span<void> SnpeBackend::GetInputBuffer(size_t index) const {
+    (void)index;
+    return {};
+}
+
+utils::Span<void> SnpeBackend::GetOutputBuffer(size_t index) const {
+    (void)index;
+    return {};
+}
+
 std::string SnpeBackend::Version() const {
     return "stub";
 }

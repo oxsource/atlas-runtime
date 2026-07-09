@@ -129,5 +129,20 @@ inline size_t ElementCount(const std::vector<int>& shape) {
     return count;
 }
 
+// Lightweight non-owning view over a contiguous sequence of T elements.
+// This is a C++17-compatible subset of std::span (C++20).
+template <typename T>
+struct Span {
+    T*     data = nullptr;
+    size_t size = 0;
+
+    Span() = default;
+    Span(T* d, size_t s) : data(d), size(s) {}
+
+    bool empty() const noexcept { return size == 0; }
+    T& operator[](size_t i) noexcept { return data[i]; }
+    const T& operator[](size_t i) const noexcept { return data[i]; }
+};
+
 }  // namespace utils
 }  // namespace atlas

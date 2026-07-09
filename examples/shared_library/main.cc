@@ -68,6 +68,12 @@ int main(int argc, char* argv[]) {
         auto rc = handle.Run(input, &outputs);
         CHECK(rc == atlas::utils::ErrorCode::kOk, "Run returns kOk");
         CHECK(outputs.size() == 1u, "Run produces 1 output tensor");
+
+        // Demonstrate Span<const float> access for typed output data.
+        atlas::utils::Span<const float> out(
+            static_cast<const float*>(outputs[0].data),
+            outputs[0].byte_size / sizeof(float));
+        CHECK(!out.empty(), "Run produces non-empty output data");
     }
 
     // Test 6: invalid model

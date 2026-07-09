@@ -117,6 +117,42 @@ std::vector<utils::TensorInfo> ModelHandle::GetOutputInfo() const {
     return entry_->backend->GetOutputInfo();
 }
 
+utils::TensorInfo ModelHandle::GetInputInfoAt(size_t index) const {
+    if (!IsValid()) return {};
+    return entry_->backend->GetInputInfoAt(index);
+}
+
+utils::TensorInfo ModelHandle::GetOutputInfoAt(size_t index) const {
+    if (!IsValid()) return {};
+    return entry_->backend->GetOutputInfoAt(index);
+}
+
+utils::Tensor ModelHandle::GetInputTensor(size_t index) const {
+    if (!IsValid()) return {};
+    auto buf = entry_->backend->GetInputBuffer(index);
+    if (buf.data == nullptr || buf.size == 0) return {};
+
+    utils::Tensor t;
+    t.data      = buf.data;
+    t.byte_size = buf.size;
+    t.owns_data = false;
+    t.info      = entry_->backend->GetInputInfoAt(index);
+    return t;
+}
+
+utils::Tensor ModelHandle::GetOutputTensor(size_t index) const {
+    if (!IsValid()) return {};
+    auto buf = entry_->backend->GetOutputBuffer(index);
+    if (buf.data == nullptr || buf.size == 0) return {};
+
+    utils::Tensor t;
+    t.data      = buf.data;
+    t.byte_size = buf.size;
+    t.owns_data = false;
+    t.info      = entry_->backend->GetOutputInfoAt(index);
+    return t;
+}
+
 std::string ModelHandle::GetBackend() const {
     if (!IsValid()) return {};
     return entry_->config.backend;

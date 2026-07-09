@@ -133,9 +133,10 @@ TEST_F(CpuBackendTest, InferIdentityPreservesValues) {
     ASSERT_EQ(backend_.Infer(inputs, outputs), utils::ErrorCode::kOk);
     ASSERT_EQ(outputs.size(), 1u);
 
-    const size_t count = outputs[0].byte_size / sizeof(float);
-    const float* data  = static_cast<const float*>(outputs[0].data);
-    for (size_t i = 0; i < count; ++i) {
+    utils::Span<const float> data(
+        static_cast<const float*>(outputs[0].data),
+        outputs[0].byte_size / sizeof(float));
+    for (size_t i = 0; i < data.size; ++i) {
         EXPECT_FLOAT_EQ(data[i], kFill);
     }
 }

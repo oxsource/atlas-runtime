@@ -23,6 +23,12 @@ cc_library(
 )
 
 cc_library(
+    name = "span",
+    hdrs = ["span.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
     name = "strings",
     srcs = ["strings.cc"],
     hdrs = ["strings.h"],

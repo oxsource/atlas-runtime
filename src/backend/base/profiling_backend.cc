@@ -117,6 +117,14 @@ std::vector<utils::TensorInfo> ProfilingBackend::GetOutputInfo() const {
     return inner_->GetOutputInfo();
 }
 
+utils::Span<void> ProfilingBackend::GetInputBuffer(size_t index) const {
+    return inner_->GetInputBuffer(index);
+}
+
+utils::Span<void> ProfilingBackend::GetOutputBuffer(size_t index) const {
+    return inner_->GetOutputBuffer(index);
+}
+
 bool ProfilingBackend::IsLoaded() const { return inner_->IsLoaded(); }
 
 std::string ProfilingBackend::Version() const { return inner_->Version(); }

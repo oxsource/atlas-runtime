@@ -28,3 +28,8 @@ NNN-short-kebab-title.md
 | [007](007-third-party-dir-restructuring.md) | 三方库目录按类型分文件夹管理 | 已采纳 |
 | [008](008-logger-implementation.md) | 日志输出管理系统 | 已采纳 |
 | [009](009-backend-version-interface.md) | IBackend 后端独立版本号接口 | 已采纳 |
+| [010](010-locale-safe-string-parse-utils.md) | 本地化安全的字符串解析工具 | 已采纳 |
+| [011](011-snpe-cpu-shared-library-comparison-test.md) | SNPE CPU 共享库对比测试 | 已采纳 |
+| [012](012-snpe-backend-inference-optimization.md) | SNPE 后端推理性能优化 | 已采纳 |
+| [013](013-backend-profiling.md) | 后端性能分析装饰器 | 已采纳 |
+| [014](014-backend-interface-symmetry-and-span.md) | IBackend 接口对称性与 Span 统一类型 | 已完成 |

@@ -10,6 +10,7 @@ cc_library(
     deps = [
         ":i_backend_context",
         "//src/core:manifest_config",
+        "//src/utils:span",
         "//src/utils:types",
     ],
     visibility = ["//visibility:public"],

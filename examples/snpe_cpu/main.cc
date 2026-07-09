@@ -5,10 +5,19 @@
 // Platform constraint: SNPE backend is only functional on linux_aarch64 /
 // android_arm64. On other platforms the stub returns kBackendNotFound.
 //
+// This example demonstrates the symmetric zero-copy data path using
+// GetInputTensor() and GetOutputTensor():
+//   1. GetInputTensor(0) returns a writable Tensor backed by the SNPE
+//      ITensor internal buffer — write input data directly, no malloc.
+//   2. Run() detects the buffer is pre-filled and skips the input memcpy.
+//   3. GetOutputTensor(0) returns a Tensor pointing to the SNPE output
+//      memory — read results with no extra memcpy on the output side.
+//
 // Build:  bazel build //examples/snpe_cpu:snpe_cpu
 // Run:    SAMPLE_MODEL_DIR=<path> ./bazel-bin/examples/snpe_cpu/snpe_cpu \
 //             examples/snpe_cpu/manifest.json
 
+#include <cmath>
 #include <cstddef>
 #include <cstdlib>
 #include <string>
@@ -22,27 +31,27 @@
 namespace {
 
 // ---------------------------------------------------------------------------
-// Creates a synthetic H×W BGR raw image (HWC uint8).
-// Fills a gradient: B increases with row, G with column, R = 128.
+// Fills a float32 NCHW tensor with a synthetic gradient pattern.
+// Each channel C at position (c, h, w) gets a distinct value so the output
+// can be visually verified (ReLU is identity for positive values).
 // ---------------------------------------------------------------------------
-atlas::utils::Tensor CreateSampleBGRImage(int h, int w) {
-    atlas::utils::Tensor img;
-    img.info.dtype  = atlas::utils::DataType::kUInt8;
-    img.info.shape  = {h, w, 3};
-    img.info.layout = "HWC";
-    img.byte_size   = static_cast<size_t>(h * w * 3);
-    img.data        = malloc(img.byte_size);
-    img.owns_data   = true;
-
-    uint8_t* p = static_cast<uint8_t*>(img.data);
-    for (int r = 0; r < h; ++r) {
-        for (int c = 0; c < w; ++c) {
-            p[(r * w + c) * 3 + 0] = static_cast<uint8_t>(r * 255 / h);  // B
-            p[(r * w + c) * 3 + 1] = static_cast<uint8_t>(c * 255 / w);  // G
-            p[(r * w + c) * 3 + 2] = 128;                                  // R
+void FillGradientNCHW(float* data, int n, int c, int h, int w) {
+    for (int cn = 0; cn < n; ++cn) {
+        for (int cc = 0; cc < c; ++cc) {
+            for (int ch = 0; ch < h; ++ch) {
+                for (int cw = 0; cw < w; ++cw) {
+                    const size_t idx =
+                        static_cast<size_t>(cn) * c * h * w +
+                        static_cast<size_t>(cc) * h * w +
+                        static_cast<size_t>(ch) * w +
+                        static_cast<size_t>(cw);
+                    // Each pixel gets a distinct positive value (ReLU won't
+                    // clamp anything).
+                    data[idx] = static_cast<float>(idx + 1);
+                }
+            }
         }
     }
-    return img;
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +78,7 @@ int main(int argc, char* argv[]) {
     if (argc < 2) {
         ATLAS_LOGE("Usage: snpe_cpu <manifest_path>\n"
                    "  Set SAMPLE_MODEL_DIR to the directory containing\n"
-                   "  identity_snpe.dlc before running.");
+                   "  relu_snpe.dlc before running.");
         return 1;
     }
     const std::string manifest_path = argv[1];
@@ -126,17 +135,52 @@ int main(int argc, char* argv[]) {
         ATLAS_LOGD("%s", cfg_str.c_str());
     }
 
-    // -- Step 3: Prepare input -------------------------------------------
-    // The Pipeline auto-converts: uint8 HWC BGR -> float32 NCHW RGB.
-    ATLAS_LOGD("-- Step 3: Create Input Image --");
-    constexpr int kH = 4, kW = 4;
-    auto raw_image = CreateSampleBGRImage(kH, kW);
-    ATLAS_LOGD("Created %dx%d BGR image (HWC uint8).", kH, kW);
+    // -- Step 3: Zero-copy input via GetInputTensor() --------------------
+    // GetInputTensor() returns a Tensor whose data pointer points directly
+    // into the SNPE ITensor internal buffer.  We write synthetic float32
+    // NCHW data into this buffer — no malloc, no memcpy on the input path.
+    ATLAS_LOGD("-- Step 3: Write Input via GetInputTensor() --");
+    auto input_tensor = model.GetInputTensor(0);
+    if (input_tensor.data == nullptr) {
+        ATLAS_LOGE("[ERROR] GetInputTensor not supported by this backend.");
+        return 1;
+    }
+    ATLAS_LOGD("Got input tensor: name='%s'  shape=[%s]  layout=%s  "
+               "%zu bytes",
+               input_tensor.info.name.c_str(),
+               [&] {
+                   std::string s;
+                   for (int d : input_tensor.info.shape)
+                       s += std::to_string(d) + ",";
+                   return s;
+               }()
+                   .c_str(),
+               input_tensor.info.layout.c_str(),
+               input_tensor.byte_size);
 
-    // -- Step 4: Run inference --------------------------------------------
-    ATLAS_LOGD("-- Step 4: Run SNPE Inference (CPU Runtime) --");
+    // Fill the ITensor buffer directly with synthetic float32 NCHW data.
+    // The model expects shape [1, 3, 4, 4] (from the manifest).
+    constexpr int kInN = 1, kInC = 3, kInH = 4, kInW = 4;
+    if (static_cast<int>(input_tensor.byte_size / sizeof(float)) !=
+        kInN * kInC * kInH * kInW) {
+        ATLAS_LOGE("[ERROR] Unexpected input size: %zu",
+                   input_tensor.byte_size);
+        return 1;
+    }
+    FillGradientNCHW(static_cast<float*>(input_tensor.data),
+                     kInN, kInC, kInH, kInW);
+    ATLAS_LOGD("Filled %dx%dx%dx%d float32 NCHW tensor.", kInN, kInC, kInH,
+               kInW);
+
+    // -- Step 4: Run inference (zero-copy input + output) -----------------
+    // The Tensor passed to Run() has the same data pointer as the ITensor
+    // internal buffer.  SnpeBackend::Infer() detects this via pointer
+    // comparison and skips the input memcpy.
+    // Output tensors are zero-copy too: Infer() pushes Tensor with
+    // owns_data=false pointing into the SNPE output_map.
+    ATLAS_LOGD("-- Step 4: Run SNPE Inference (zero-copy input + output) --");
     std::vector<atlas::utils::Tensor> outputs;
-    ret = model.Run(raw_image, &outputs);
+    ret = model.Run(input_tensor, &outputs);
 
     if (ret == atlas::utils::ErrorCode::kBackendNotFound) {
         ATLAS_LOGD("SNPE backend not available on this platform "
@@ -154,14 +198,19 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // -- Step 5: Print results -------------------------------------------
-    ATLAS_LOGD("-- Step 5: Results --");
-    const float* out_data  = static_cast<const float*>(outputs[0].data);
-    const size_t out_count = outputs[0].byte_size / sizeof(float);
-    int   top1  = ArgMaxAbs(out_data, out_count);
+        // -- Step 5: Print results (zero-copy output, no extra memcpy) --------
+    ATLAS_LOGD("-- Step 5: Results (zero-copy output) --");
+    if (outputs.empty()) {
+        ATLAS_LOGE("[ERROR] No output tensors returned.");
+        return 1;
+    }
+    atlas::utils::Span<const float> out_data(
+        static_cast<const float*>(outputs[0].data),
+        outputs[0].byte_size / sizeof(float));
+    int   top1  = ArgMaxAbs(out_data.data, out_data.size);
     float value = out_data[top1];
     ATLAS_LOGD("SNPE identity output: %zu elements, top-1 index=%d  value=%f",
-               out_count, top1, value);
+               out_data.size, top1, value);
 
     // -- Step 6: Release --------------------------------------------------
     runtime.Release();

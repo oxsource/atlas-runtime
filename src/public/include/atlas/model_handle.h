@@ -40,6 +40,20 @@ class ATLAS_API ModelHandle {
     // Both return empty vectors if IsValid() == false.
     std::vector<utils::TensorInfo> GetInputInfo()  const;
     std::vector<utils::TensorInfo> GetOutputInfo() const;
+    utils::TensorInfo GetInputInfoAt(size_t index) const;
+    utils::TensorInfo GetOutputInfoAt(size_t index) const;
+
+    // Returns a Tensor backed by the backend's internal input buffer.
+    // Callers write data directly into tensor.data, then pass the tensor
+    // to Run() for zero-copy inference (no memcpy on the input path).
+    // Returns an empty Tensor if the backend does not support this.
+    utils::Tensor GetInputTensor(size_t index) const;
+
+    // Returns a Tensor backed by the backend's internal output buffer.
+    // After Run(), tensor.data contains the inference result with no extra
+    // memcpy — the buffer is the backend's own output memory.
+    // Returns an empty Tensor if the backend does not support this.
+    utils::Tensor GetOutputTensor(size_t index) const;
 
     // Returns the backend name, e.g. "cpu".  Returns empty string if
     // IsValid() == false.

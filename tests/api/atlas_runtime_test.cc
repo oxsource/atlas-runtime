@@ -219,9 +219,10 @@ TEST(AtlasRuntimeTest, EndToEndInferencePreservesValues) {
     // colour), HWCToCHW, and identity inference, all values should equal
     // static_cast<float>(kFill).
     const float expected = static_cast<float>(kFill);
-    const float* data    = static_cast<const float*>(outputs[0].data);
-    const size_t count   = outputs[0].byte_size / sizeof(float);
-    for (size_t i = 0; i < count; ++i) {
+    utils::Span<const float> data(
+        static_cast<const float*>(outputs[0].data),
+        outputs[0].byte_size / sizeof(float));
+    for (size_t i = 0; i < data.size; ++i) {
         EXPECT_FLOAT_EQ(data[i], expected);
     }
 }

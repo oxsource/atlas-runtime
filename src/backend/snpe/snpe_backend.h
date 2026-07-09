@@ -34,6 +34,9 @@ class SnpeBackend : public IBackend {
     utils::ErrorCode Infer(const std::vector<utils::Tensor>& inputs,
                             std::vector<utils::Tensor>& outputs) override;
 
+    utils::Span<void> GetInputBuffer(size_t index) const override;
+    utils::Span<void> GetOutputBuffer(size_t index) const override;
+
     std::vector<utils::TensorInfo> GetInputInfo()  const override;
     std::vector<utils::TensorInfo> GetOutputInfo() const override;
 
