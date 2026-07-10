@@ -45,10 +45,24 @@ utils::ErrorCode ModelManager::Init(const ManifestConfig& manifest) {
                    model.id.c_str(), model.backend.c_str(),
                    model.load_strategy == LoadStrategy::kLazy ? "lazy" : "eager");
 
-        // Create Profiler first (profiling-enabled models only).
+        // Insert entry into the map first so ProfileConfig lives at a
+        // permanent address.  Profiler::config_ will point to
+        // entry.profile inside the map and remain valid for the lifetime
+        // of the entry.
+        auto [it, inserted] = entries_.emplace(model.id, ModelEntry{});
+        if (!inserted) {
+            ATLAS_LOGE("duplicate model id: %s", model.id.c_str());
+            ReleaseAll();
+            return utils::ErrorCode::kInvalidArgument;
+        }
+        ModelEntry& entry = it->second;
+        entry.config  = model;
+        entry.profile = manifest.profile;
+
+        // Create Profiler, pointing to entry.profile (permanent map address).
         std::unique_ptr<backend::Profiler> profiler;
         if (manifest.profile.enabled) {
-            profiler = std::make_unique<backend::Profiler>(manifest.profile, model.id);
+            profiler = std::make_unique<backend::Profiler>(entry.profile, model.id);
         }
 
         // Create the raw backend instance.
@@ -60,19 +74,18 @@ utils::ErrorCode ModelManager::Init(const ManifestConfig& manifest) {
         }
 
         // Wrap with ProfilingBackend if profiling is enabled.
-        // ProfilingBackend receives a raw pointer to Profiler; the Profiler
-        // is later moved into ModelEntry, but unique_ptr::move preserves the
-        // object's address, so the raw pointer remains valid.
+        // ProfilingBackend receives a raw pointer to Profiler (via
+        // unique_ptr::get()): moving the unique_ptr into entry.profiler
+        // preserves the heap object's address, so the raw pointer stays
+        // valid.
         if (profiler) {
             backend_instance = std::make_unique<backend::ProfilingBackend>(
                 std::move(backend_instance), profiler.get());
         }
 
-        ModelEntry entry;
-        entry.config   = model;
         entry.backend  = std::move(backend_instance);
         entry.profiler = std::move(profiler);
-        entry.profile  = manifest.profile;
+
         // Build per-input preprocessing pipeline and per-output postprocessing
         // pipeline. Priority: explicit pipeline array > disable_pipeline flag
         // > auto-built input pipeline.
@@ -96,8 +109,6 @@ utils::ErrorCode ModelManager::Init(const ManifestConfig& manifest) {
             }
         }
         entry.loaded = false;
-
-        entries_.emplace(model.id, std::move(entry));
     }
 
     // Step 3: eagerly load models whose strategy is kEager.
