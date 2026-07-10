@@ -11,8 +11,7 @@ constexpr char             kOrtEnvName[] = "atlas_cpu_shared";
 }  // namespace
 
 CpuBackendContext::CpuBackendContext()
-    : env_(std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING,
-                                      kOrtEnvName)) {}
+    : env_(std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, kOrtEnvName)) {}
 
 std::string_view CpuBackendContext::BackendType() const {
     return kBackendType;

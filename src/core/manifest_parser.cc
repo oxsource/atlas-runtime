@@ -137,9 +137,7 @@ bool ExpandEnvVars(std::string* str) {
             break;
         }
 
-        std::string var_name =
-            src.substr(start + kEnvVarNameOffset,
-                       end - start - kEnvVarNameOffset);
+        std::string var_name = src.substr(start + kEnvVarNameOffset, end - start - kEnvVarNameOffset);
         const char* val = std::getenv(var_name.c_str());
         if (val == nullptr) {
             return false;
@@ -330,8 +328,7 @@ utils::ErrorCode ManifestParser::Parse(const std::string& path,
     std::rewind(file);
 
     std::string content(static_cast<size_t>(file_size), '\0');
-    const size_t read_bytes = std::fread(content.data(), 1,
-                                          static_cast<size_t>(file_size), file);
+    const size_t read_bytes = std::fread(content.data(), 1, static_cast<size_t>(file_size), file);
     std::fclose(file);
 
     if (static_cast<long>(read_bytes) != file_size) {

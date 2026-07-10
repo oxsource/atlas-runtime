@@ -149,16 +149,30 @@ Load() 步骤 7: 预分配资源（直接使用步骤 6 的 output）
 
 #### 2.3.1 UserBuffer 创建 API
 
-SNPE 1.x 和 2.x 的 UserBuffer 创建 API 签名一致（仅命名空间前缀不同）：
+SNPE 1.x 和 2.x 的 UserBuffer 创建 API 签名不同：
+
+- **v2 (2.x)**：`SNPE::createInputBuffer()` / `createOutputBuffer()`，接受 `(name, size, stride_array, encoding)` 参数
+- **v1 (1.x)**：`SNPEFactory::getUserBufferFactory().createUserBuffer()`，接受 `(buffer_ptr, bufSize, stride_shape, encoding)` 参数（stride 以 `TensorShape` 形式传入）
 
 ```cpp
-auto input_buffer = snpe->createInputBuffer(
-    name.c_str(),            // tensor 名称
-    raw_buffer_size,         // 缓冲区字节数
-    stride.data(),           // stride 数组
-    encoding.get()           // UserBufferEncoding 指针
-);
+// v2 写法 (2.21.0)：
+auto input_buffer = impl_->snpe->createInputBuffer(
+    name.c_str(),
+    raw.size,
+    stride.data(),
+    encoding.get());
+
+// v1 写法 (1.50.0) —— SNPE 对象无 createInputBuffer()，通过工厂创建：
+auto& ub_factory = zdl::SNPE::SNPEFactory::getUserBufferFactory();
+zdl::DlSystem::TensorShape stride_shape(stride);
+auto user_buf = ub_factory.createUserBuffer(
+    raw.data,
+    raw.size,
+    stride_shape,
+    encoding.get());
 ```
+
+v1 的 `IUserBufferFactory::createUserBuffer()` 返回 `unique_ptr<IUserBuffer>`，v2 的 `SNPE::createInputBuffer()` 同样返回 `unique_ptr<IUserBuffer>`，两者最终类型一致。
 
 #### 2.3.2 Stride 计算公式
 
@@ -226,7 +240,8 @@ QuantParams ExtractQuantParamsFromAttrs(IBufferAttributes* attrs) {
             attrs->getEncoding());
         qp.scale      = tfN->getQuantizedStepSize();
         qp.zero_point = tfN->getStepExactly0();
-        qp.bandwidth  = tfN->getBandWidth();
+        // NOTE: v1 (1.x) 的 UserBufferEncodingTfN 没有 getBandWidth()
+        // 默认 bandwidth=8（TF8）已满足需求，无需调用 getBandWidth()
     }
     return qp;
 }

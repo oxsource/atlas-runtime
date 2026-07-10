@@ -15,6 +15,7 @@
 #include "DlSystem/ITensor.hpp"
 #include "DlSystem/ITensorFactory.hpp"
 #include "DlSystem/IUserBuffer.hpp"
+#include "DlSystem/IUserBufferFactory.hpp"
 #include "DlSystem/StringList.hpp"
 #include "DlSystem/TensorMap.hpp"
 #include "DlSystem/TensorShape.hpp"
@@ -172,44 +173,33 @@ int ParseRuntime(const std::string& runtime_str) {
 
 int ParsePerformanceProfile(const std::string& profile_str) {
     if (profile_str == kPerfDefault || profile_str == kPerfBalanced) {
-        return static_cast<int>(
-            zdl::DlSystem::PerformanceProfile_t::BALANCED);
+        return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::BALANCED);
     }
     if (profile_str == kPerfHighPerformance) {
-        return static_cast<int>(
-            zdl::DlSystem::PerformanceProfile_t::HIGH_PERFORMANCE);
+        return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::HIGH_PERFORMANCE);
     }
     if (profile_str == kPerfPowerSaver) {
-        return static_cast<int>(
-            zdl::DlSystem::PerformanceProfile_t::POWER_SAVER);
+        return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::POWER_SAVER);
     }
     if (profile_str == kPerfSystemSettings) {
-        return static_cast<int>(
-            zdl::DlSystem::PerformanceProfile_t::SYSTEM_SETTINGS);
+        return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::SYSTEM_SETTINGS);
     }
     if (profile_str == kPerfSustainedHighPerf) {
-        return static_cast<int>(
-            zdl::DlSystem::PerformanceProfile_t::
-                SUSTAINED_HIGH_PERFORMANCE);
+        return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::SUSTAINED_HIGH_PERFORMANCE);
     }
     if (profile_str == kPerfBurst) {
-        return static_cast<int>(
-            zdl::DlSystem::PerformanceProfile_t::BURST);
+        return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::BURST);
     }
     if (profile_str == kPerfLowPowerSaver) {
-        return static_cast<int>(
-            zdl::DlSystem::PerformanceProfile_t::LOW_POWER_SAVER);
+        return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::LOW_POWER_SAVER);
     }
     if (profile_str == kPerfHighPowerSaver) {
-        return static_cast<int>(
-            zdl::DlSystem::PerformanceProfile_t::HIGH_POWER_SAVER);
+        return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::HIGH_POWER_SAVER);
     }
     if (profile_str == kPerfLowBalanced) {
-        return static_cast<int>(
-            zdl::DlSystem::PerformanceProfile_t::LOW_BALANCED);
+        return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::LOW_BALANCED);
     }
-    return static_cast<int>(
-        zdl::DlSystem::PerformanceProfile_t::BALANCED);
+    return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::BALANCED);
 }
 
 // Aligned memory alignment constant for DSP/HTP buffers.
@@ -274,22 +264,20 @@ std::unique_ptr<zdl::DlSystem::UserBufferEncoding> CreateEncoding(
     }
 }
 
-// Extracts quantization parameters (scale, zero_point, bandwidth) from
+// Extracts quantization parameters (scale, zero_point) from
 // SNPE IBufferAttributes encoding.  Returns default QuantParams when the
 // encoding is not a quantized type (TF8/TF16).
+// NOTE: SNPE 1.x UserBufferEncodingTfN does NOT have getBandWidth();
+// we rely on the default bandwidth=8 (TF8).
 SnpeBackend::QuantParams ExtractQuantParamsFromAttrs(
     zdl::DlSystem::IBufferAttributes* attrs) {
     SnpeBackend::QuantParams qp;
     auto encoding_type = attrs->getEncodingType();
-    if (encoding_type ==
-            zdl::DlSystem::UserBufferEncoding::ElementType_t::TF8 ||
-        encoding_type ==
-            zdl::DlSystem::UserBufferEncoding::ElementType_t::TF16) {
-        auto* tfN = static_cast<zdl::DlSystem::UserBufferEncodingTfN*>(
-            attrs->getEncoding());
+    if (encoding_type == zdl::DlSystem::UserBufferEncoding::ElementType_t::TF8 ||
+        encoding_type == zdl::DlSystem::UserBufferEncoding::ElementType_t::TF16) {
+        auto* tfN = static_cast<zdl::DlSystem::UserBufferEncodingTfN*>(attrs->getEncoding());
         qp.scale      = tfN->getQuantizedStepSize();
         qp.zero_point = tfN->getStepExactly0();
-        qp.bandwidth  = tfN->getBandWidth();
     }
     return qp;
 }
@@ -395,8 +383,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
             out_names.append(mo.name.c_str());
         }
         builder.setOutputTensors(out_names);
-        ATLAS_LOGD("setOutputTensors: %zu output(s) from manifest",
-                   model_config_.outputs.size());
+        ATLAS_LOGD("setOutputTensors: %zu output(s) from manifest", model_config_.outputs.size());
     }
 
     impl_->snpe = builder.build();
@@ -416,8 +403,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
         }
         impl_->input_names.clear();
         for (const auto& name : *opt_in_names) {
-            impl_->input_names.emplace_back(
-                static_cast<const std::string&>(name));
+            impl_->input_names.emplace_back(static_cast<const std::string&>(name));
         }
     }
     {
@@ -429,8 +415,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
         }
         impl_->output_names.clear();
         for (const auto& name : *opt_out_names) {
-            impl_->output_names.emplace_back(
-                static_cast<const std::string&>(name));
+            impl_->output_names.emplace_back(static_cast<const std::string&>(name));
         }
     }
 
@@ -508,8 +493,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
 
             // Use pre-computed info + quant params from BuildTensorInfos(),
             // no redundant getInputOutputBufferAttributes() call.
-            auto encoding = CreateEncoding(info.dtype, qp.scale,
-                                           qp.zero_point, qp.bandwidth);
+            auto encoding = CreateEncoding(info.dtype, qp.scale, qp.zero_point, qp.bandwidth);
             if (encoding == nullptr) {
                 ATLAS_LOGE("Unsupported input[%zu] dtype %d for UserBuffer",
                            i, static_cast<int>(info.dtype));
@@ -518,8 +502,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
             }
 
             const size_t element_size = ElementByteSize(info.dtype);
-            std::vector<size_t> stride = ComputeUserBufferStride(
-                info.shape, element_size);
+            std::vector<size_t> stride = ComputeUserBufferStride(info.shape, element_size);
             const size_t buffer_size = stride.empty() ? 0 : stride[0] *
                 static_cast<size_t>(std::max(info.shape[0], 1));
 
@@ -548,10 +531,14 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
                 }
             }
 
-            auto user_buf = impl_->snpe->createInputBuffer(
-                name.c_str(),
+            // SNPE 1.x uses SNPEFactory::getUserBufferFactory() instead of
+            // snpe->createInputBuffer() (which doesn't exist in v1).
+            auto& ub_factory = zdl::SNPE::SNPEFactory::getUserBufferFactory();
+            zdl::DlSystem::TensorShape stride_shape(stride);
+            auto user_buf = ub_factory.createUserBuffer(
+                raw.data,
                 static_cast<size_t>(raw.size),
-                stride.data(),
+                stride_shape,
                 encoding.get());
             if (user_buf == nullptr) {
                 ATLAS_LOGE("Failed to create input UserBuffer[%zu]: %s",
@@ -564,8 +551,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
             impl_->user_input_raw.push_back(std::move(raw));
             impl_->user_input_buffers.push_back(std::move(user_buf));
             impl_->user_input_external.push_back(nullptr);
-            impl_->input_buffer_stride.push_back(
-                stride.empty() ? 0 : stride[0]);
+            impl_->input_buffer_stride.push_back(stride.empty() ? 0 : stride[0]);
         }
 
         // Create output UserBuffers.
@@ -580,8 +566,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
             const QuantParams& qp = output_quant_params_[i];
 
             // Use pre-computed info + quant params from BuildTensorInfos().
-            auto encoding = CreateEncoding(info.dtype, qp.scale,
-                                           qp.zero_point, qp.bandwidth);
+            auto encoding = CreateEncoding(info.dtype, qp.scale, qp.zero_point, qp.bandwidth);
             if (encoding == nullptr) {
                 ATLAS_LOGE("Unsupported input[%zu] dtype %d for UserBuffer",
                            i, static_cast<int>(info.dtype));
@@ -590,8 +575,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
             }
 
             const size_t element_size = ElementByteSize(info.dtype);
-            std::vector<size_t> stride = ComputeUserBufferStride(
-                info.shape, element_size);
+            std::vector<size_t> stride = ComputeUserBufferStride(info.shape, element_size);
             const size_t buffer_size = stride.empty() ? 0 : stride[0] *
                 static_cast<size_t>(std::max(info.shape[0], 1));
 
@@ -603,10 +587,14 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
                 return utils::ErrorCode::kInferFailed;
             }
 
-            auto user_buf = impl_->snpe->createOutputBuffer(
-                name.c_str(),
+            // SNPE 1.x uses SNPEFactory::getUserBufferFactory() instead of
+            // snpe->createOutputBuffer() (which doesn't exist in v1).
+            auto& ub_factory = zdl::SNPE::SNPEFactory::getUserBufferFactory();
+            zdl::DlSystem::TensorShape stride_shape(stride);
+            auto user_buf = ub_factory.createUserBuffer(
+                raw.data,
                 static_cast<size_t>(raw.size),
-                stride.data(),
+                stride_shape,
                 encoding.get());
             if (user_buf == nullptr) {
                 ATLAS_LOGE("Failed to create output UserBuffer[%zu]: %s",
@@ -618,8 +606,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
             impl_->user_output_encodings.push_back(std::move(encoding));
             impl_->user_output_raw.push_back(std::move(raw));
             impl_->user_output_buffers.push_back(std::move(user_buf));
-            impl_->output_buffer_stride.push_back(
-                stride.empty() ? 0 : stride[0]);
+            impl_->output_buffer_stride.push_back(stride.empty() ? 0 : stride[0]);
         }
     }
 
@@ -945,8 +932,7 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
     for (const auto& name : impl_->input_names) {
         auto opt_attrs = impl_->snpe->getInputOutputBufferAttributes(name.c_str());
         if (!opt_attrs || *opt_attrs == nullptr) {
-            ATLAS_LOGE("Failed to get input buffer attributes for tensor: %s",
-                       name.c_str());
+            ATLAS_LOGE("Failed to get input buffer attributes for tensor: %s", name.c_str());
             return utils::ErrorCode::kInferFailed;
         }
 
@@ -971,7 +957,8 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
         }
 
         // Extract quantization params from runtime buffer attributes.
-        QuantParams qp = ExtractQuantParamsFromAttrs(opt_attrs->get());
+        // NOTE: SNPE 1.x Optional has no .get(); dereference with *.
+        QuantParams qp = ExtractQuantParamsFromAttrs(*opt_attrs);
 
         // Manifest config overrides (if present) — manifest is first priority.
         for (const auto& mi : model_config_.inputs) {
@@ -992,8 +979,7 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
     for (const auto& name : impl_->output_names) {
         auto opt_attrs = impl_->snpe->getInputOutputBufferAttributes(name.c_str());
         if (!opt_attrs || *opt_attrs == nullptr) {
-            ATLAS_LOGE("Failed to get output buffer attributes for tensor: %s",
-                       name.c_str());
+            ATLAS_LOGE("Failed to get output buffer attributes for tensor: %s", name.c_str());
             return utils::ErrorCode::kInferFailed;
         }
 
@@ -1012,7 +998,8 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
         }
 
         // Extract quantization params from runtime buffer attributes.
-        QuantParams qp = ExtractQuantParamsFromAttrs(opt_attrs->get());
+        // NOTE: SNPE 1.x Optional has no .get(); dereference with *.
+        QuantParams qp = ExtractQuantParamsFromAttrs(*opt_attrs);
 
         // Manifest config overrides (if present) — manifest is first priority.
         for (const auto& mo : model_config_.outputs) {

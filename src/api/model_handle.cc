@@ -34,8 +34,7 @@ utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
     std::vector<utils::Tensor> inputs;
     // Add batch dimension to shape if pipeline output is 3-D (C×H×W).
     if (preprocessed.info.shape.size() == 3) {
-        preprocessed.info.shape.insert(
-            preprocessed.info.shape.begin(), 1);
+        preprocessed.info.shape.insert(preprocessed.info.shape.begin(), 1);
     }
     inputs.push_back(std::move(preprocessed));
 
@@ -81,8 +80,7 @@ utils::ErrorCode ModelHandle::Run(const std::vector<utils::Tensor>& raw_inputs,
         }
         // Add batch dimension to shape if pipeline output is 3-D (C×H×W).
         if (processed.info.shape.size() == 3) {
-            processed.info.shape.insert(
-                processed.info.shape.begin(), 1);
+            processed.info.shape.insert(processed.info.shape.begin(), 1);
         }
         preprocessed.push_back(std::move(processed));
     }

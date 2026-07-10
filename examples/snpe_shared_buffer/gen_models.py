@@ -1,33 +1,77 @@
 #!/usr/bin/env python3
-"""
-Generates two minimal SNPE DLC models for the shared buffer example.
+"""Generates two ReLU .dlc models for the SNPE shared buffer demo.
 
-Both models are ReLU identity networks:
-  - Input:  "input"  float32 [1, 3, 4, 4]  (NCHW)
-  - ReLU:   ReLU activation (identity for positive values)
-  - Output: "output" float32 [1, 3, 4, 4]
+Both models are simple ReLU identity networks (1x3x4x4 float32 input/output).
+They are structurally identical — the demo's purpose is to test shared input
+buffer functionality between multiple models.
+
+Prerequisites:
+  - SNPE SDK installed (SNPE_SDK_PATH environment variable)
+  - Python 3.8+ with onnx available
+
+Workflow:
+  1. Generate two ONNX ReLU models (1x3x4x4 float32)
+  2. Convert ONNX -> .dlc via snpe-onnx-to-dlc
 
 Usage:
-    python3 gen_models.py <output_dir>
+  python3 examples/snpe_shared_buffer/gen_models.py <output_dir>
 
-Requirements:
-    - snpe-net-run, snpe-tensorflow-to-dlc, or snpe-onnx-to-dlc
-      from the Qualcomm SNPE SDK in PATH.
-    - For simplicity, this script can generate a .dlc using
-      snpe-net-run's --container option OR create a simple
-      protobuf-based model description.
-
-NOTE: This script is a placeholder.  In practice, you would:
-  1. Create a TensorFlow/ONNX model.
-  2. Convert it using snpe-tensorflow-to-dlc or snpe-onnx-to-dlc.
-  3. Copy the .dlc files to SAMPLE_MODEL_DIR.
-
-For CI/testing without real SNPE SDK, simply skip DLC generation;
-the examples run in stub mode on non-target platforms.
+Example:
+  python3 examples/snpe_shared_buffer/gen_models.py /tmp/snpe_models
 """
 
 import os
+import shutil
+import subprocess
 import sys
+
+import onnx
+from onnx import TensorProto, helper
+
+
+def make_relu_onnx(out_path: str) -> None:
+    """Generate an ONNX ReLU model: 1x3x4x4 float32."""
+    shape = [1, 3, 4, 4]
+    node = helper.make_node("Relu",
+                             inputs=["images"],
+                             outputs=["output"])
+    input_vi = helper.make_tensor_value_info(
+        "images", TensorProto.FLOAT, shape)
+    output_vi = helper.make_tensor_value_info(
+        "output", TensorProto.FLOAT, shape)
+    graph = helper.make_graph(
+        [node], "relu_graph", [input_vi], [output_vi])
+    model = helper.make_model(
+        graph,
+        opset_imports=[helper.make_opsetid("", 11)],
+        ir_version=7)
+    onnx.save(model, out_path)
+    print(f"  Saved ONNX: {out_path}")
+
+
+def onnx_to_dlc(onnx_path: str, dlc_path: str) -> None:
+    """Convert ONNX to SNPE .dlc via snpe-onnx-to-dlc."""
+    snpe_sdk = os.environ.get("SNPE_SDK_PATH", "")
+    if not snpe_sdk:
+        print("  Warning: SNPE_SDK_PATH is not set. "
+              "Skipping .dlc conversion.",
+              file=sys.stderr)
+        print("  Set SNPE_SDK_PATH to the root of the SNPE SDK installation "
+              "and re-run to produce the .dlc file.",
+              file=sys.stderr)
+        return
+
+    converter = os.path.join(
+        snpe_sdk, "bin", "x86_64-linux-clang", "snpe-onnx-to-dlc")
+    if not os.path.isfile(converter):
+        print(f"  Error: Converter not found at {converter}", file=sys.stderr)
+        sys.exit(1)
+
+    subprocess.run(
+        [converter, "--input_network", onnx_path,
+         "--output_path", dlc_path],
+        check=True)
+    print(f"  Saved DLC: {dlc_path}")
 
 
 def main():
@@ -37,54 +81,21 @@ def main():
 
     out_dir = sys.argv[1]
     os.makedirs(out_dir, exist_ok=True)
+    print(f"Generating models in: {out_dir}")
 
-    # Generate a simple ReLU model using snpe-tensorflow-to-dlc
-    # if available in PATH.
-    model_a_path = os.path.join(out_dir, "model_a.dlc")
-    model_b_path = os.path.join(out_dir, "model_b.dlc")
+    for model_id in ["model_a", "model_b"]:
+        print(f"\n--- {model_id} ---")
+        onnx_path = os.path.join(out_dir, f"{model_id}.onnx")
+        dlc_path = os.path.join(out_dir, f"{model_id}.dlc")
 
-    # Check if snpe-tensorflow-to-dlc is available.
-    import shutil
-    converter = shutil.which("snpe-tensorflow-to-dlc")
+        make_relu_onnx(onnx_path)
+        onnx_to_dlc(onnx_path, dlc_path)
 
-    if converter is None:
-        print(f"SNPE converter not found in PATH.")
-        print(f"Please manually place the following DLC files in:")
-        print(f"  {model_a_path}")
-        print(f"  {model_b_path}")
-        print()
-        print("Example: create a simple ReLU network via TensorFlow:")
-        print("""\
-  import tensorflow as tf
-
-  # model_a: ReLU identity
-  tf.keras.Sequential([
-      tf.keras.layers.InputLayer(input_shape=(3, 4, 4)),
-      tf.keras.layers.ReLU(),
-  ]).save("relu_model_a")
-
-  # Convert with SNPE SDK
-  snpe-tensorflow-to-dlc --input_network relu_model_a \\
-      --input_dim input 1,3,4,4 \\
-      --out_node "re_lu/Relu" \\
-      --output_path model_a.dlc
-
-  # model_b: identical structure (or different scale for contrast)
-  snpe-tensorflow-to-dlc --input_network relu_model_a \\
-      --input_dim input 1,3,4,4 \\
-      --out_node "re_lu/Relu" \\
-      --output_path model_b.dlc
-""")
-        # Create placeholder files (empty) for documentation.
-        for p in [model_a_path, model_b_path]:
-            with open(p, "wb") as f:
-                f.write(b"PLACEHOLDER - replace with real SNPE DLC\n")
-        print(f"Placeholder files created at: {out_dir}/")
-        sys.exit(0)
-
-    # Real conversion path (not typically available without SNPE SDK).
-    print(f"Generating DLC models using {converter} ...")
-    # (Implementation depends on actual SNPE SDK version.)
+    print(f"\nDone. Set SAMPLE_MODEL_DIR={out_dir}")
+    print("Then run:\n"
+          f"  SAMPLE_MODEL_DIR={out_dir} \\\n"
+          "  ./bazel-bin/examples/snpe_shared_buffer/snpe_shared_buffer \\\n"
+          "  examples/snpe_shared_buffer/manifest.json")
 
 
 if __name__ == "__main__":

@@ -72,8 +72,7 @@ utils::Span<void> SnpeBackend::GetOutputBuffer(size_t index) const {
     return {};
 }
 
-utils::ErrorCode SnpeBackend::SetInputBuffer(size_t index, void* external_mem,
-                                              size_t byte_size) {
+utils::ErrorCode SnpeBackend::SetInputBuffer(size_t index, void* external_mem, size_t byte_size) {
     (void)index;
     (void)external_mem;
     (void)byte_size;

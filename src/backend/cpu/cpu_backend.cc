@@ -82,13 +82,10 @@ utils::ErrorCode CpuBackend::Load(const std::string& model_path,
 
         Ort::SessionOptions opts;
         opts.SetIntraOpNumThreads(num_threads);
-        opts.SetGraphOptimizationLevel(
-            GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
+        opts.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 
         ATLAS_LOGD("creating ORT session: %s", model_path.c_str());
-        session_ = std::make_unique<Ort::Session>(*active_env_,
-                                                   model_path.c_str(),
-                                                   opts);
+        session_ = std::make_unique<Ort::Session>(*active_env_, model_path.c_str(), opts);
     } catch (const Ort::Exception& e) {
         ATLAS_LOGE("ORT exception during Load: %s", e.what());
         own_env_.reset();
@@ -200,13 +197,10 @@ utils::ErrorCode CpuBackend::Infer(const std::vector<utils::Tensor>& inputs,
 
         utils::Tensor out;
         out.info       = output_info_[i];
-        out.byte_size  = type_shape.GetElementCount() *
-                         OrtElementByteSize(ort_dtype);
+        out.byte_size  = type_shape.GetElementCount() * OrtElementByteSize(ort_dtype);
         out.data       = malloc(out.byte_size);
         out.owns_data  = true;
-        std::memcpy(out.data,
-                    ort_outputs[i].GetTensorRawData(),
-                    out.byte_size);
+        std::memcpy(out.data, ort_outputs[i].GetTensorRawData(), out.byte_size);
         outputs.push_back(std::move(out));
     }
 

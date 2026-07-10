@@ -299,3 +299,72 @@ BasedOnStyle: Google
 IndentWidth: 4
 ColumnLimit: 100
 ```
+
+---
+
+## 十三、代码风格
+
+### 13.1 行长度
+
+遵循 Google C++ Style Guide，行长度上限 100 字符（`ColumnLimit=100`）。
+
+**原则**：能在一行内放下的语句不拆行，避免不必要的多行格式。
+
+```cpp
+// 正确：单行放得下
+auto encoding = CreateEncoding(info.dtype, qp.scale, qp.zero_point, qp.bandwidth);
+impl_->input_buffer_stride.push_back(stride.empty() ? 0 : stride[0]);
+return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::BALANCED);
+
+// 不必要：即使有预留缩进，也在 100 字符内
+auto encoding = CreateEncoding(info.dtype, qp.scale,        // ← 拆行不必要
+                               qp.zero_point, qp.bandwidth);
+```
+
+函数参数、返回值、简单表达式如果总长度 ≤ 100 字符，应写在一行。仅在表达式超出限制时使用多行格式。
+
+### 13.2 减少条件嵌套
+
+使用 `return` / `break` / `continue` 提前退出，避免深层 `if` 嵌套。条件不符合时尽早退出，将主路径保持在最外层缩进。
+
+```cpp
+// 正确：guard clause 提前退出
+if (!loaded_) return utils::ErrorCode::kNotInitialized;
+if (inputs.size() != input_info_.size()) return utils::ErrorCode::kInvalidArgument;
+
+return InferWithTensor(inputs, outputs);
+
+// 错误：深层嵌套
+if (loaded_) {
+    if (inputs.size() == input_info_.size()) {
+        return InferWithTensor(inputs, outputs);
+    } else {
+        return utils::ErrorCode::kInvalidArgument;
+    }
+} else {
+    return utils::ErrorCode::kNotInitialized;
+}
+```
+
+```cpp
+// 正确：循环中提前 continue
+for (size_t i = 0; i < inputs.size(); ++i) {
+    if (t.data == GetInputBuffer(i).data) continue;
+    if (NeedsQuantizationAdaptation(i, t.info.dtype)) {
+        AdaptU8ToTf8(t.data, target, count);
+        continue;
+    }
+    std::memcpy(target, t.data, t.byte_size);
+}
+
+// 错误：else if 链或深层嵌套
+for (size_t i = 0; i < inputs.size(); ++i) {
+    if (t.data == GetInputBuffer(i).data) {
+        // skip
+    } else if (NeedsQuantizationAdaptation(i, t.info.dtype)) {
+        AdaptU8ToTf8(t.data, target, count);
+    } else {
+        std::memcpy(target, t.data, t.byte_size);
+    }
+}
+```

@@ -46,7 +46,7 @@ class SnpeBackend : public IBackend {
     bool IsLoaded() const override;
     std::string Version() const override;
 
- private:
+ public:
     // Quantization parameters extracted from SNPE IBufferAttributes
     // at Load() time, used by the UserBuffer path.
     struct QuantParams {
@@ -55,6 +55,7 @@ class SnpeBackend : public IBackend {
         uint32_t bandwidth  = 8;      // bits (TF8=8, TF16=16)
     };
 
+ private:
     // Reads input/output metadata from the loaded SNPE network into
     // input_info_ / output_info_ / input_quant_params_ / output_quant_params_
     // and populates impl_->input_names / impl_->output_names.

@@ -179,8 +179,7 @@ int ParsePerformanceProfile(const std::string& profile_str) {
         return static_cast<int>(DlSystem::PerformanceProfile_t::SYSTEM_SETTINGS);
     }
     if (profile_str == kPerfSustainedHighPerf) {
-        return static_cast<int>(
-            DlSystem::PerformanceProfile_t::SUSTAINED_HIGH_PERFORMANCE);
+        return static_cast<int>(DlSystem::PerformanceProfile_t::SUSTAINED_HIGH_PERFORMANCE);
     }
     if (profile_str == kPerfBurst) {
         return static_cast<int>(DlSystem::PerformanceProfile_t::BURST);
@@ -195,8 +194,7 @@ int ParsePerformanceProfile(const std::string& profile_str) {
         return static_cast<int>(DlSystem::PerformanceProfile_t::LOW_BALANCED);
     }
     if (profile_str == kPerfExtremePowerSaver) {
-        return static_cast<int>(
-            DlSystem::PerformanceProfile_t::EXTREME_POWER_SAVER);
+        return static_cast<int>(DlSystem::PerformanceProfile_t::EXTREME_POWER_SAVER);
     }
     return static_cast<int>(DlSystem::PerformanceProfile_t::BALANCED);
 }
@@ -267,12 +265,9 @@ SnpeBackend::QuantParams ExtractQuantParamsFromAttrs(
     DlSystem::IBufferAttributes* attrs) {
     SnpeBackend::QuantParams qp;
     auto encoding_type = attrs->getEncodingType();
-    if (encoding_type ==
-            DlSystem::UserBufferEncoding::ElementType_t::TF8 ||
-        encoding_type ==
-            DlSystem::UserBufferEncoding::ElementType_t::TF16) {
-        auto* tfN = static_cast<DlSystem::UserBufferEncodingTfN*>(
-            attrs->getEncoding());
+    if (encoding_type == DlSystem::UserBufferEncoding::ElementType_t::TF8 ||
+        encoding_type == DlSystem::UserBufferEncoding::ElementType_t::TF16) {
+        auto* tfN = static_cast<DlSystem::UserBufferEncodingTfN*>(attrs->getEncoding());
         qp.scale      = tfN->getQuantizedStepSize();
         qp.zero_point = tfN->getStepExactly0();
         qp.bandwidth  = tfN->getBandWidth();
@@ -395,8 +390,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
         }
         impl_->input_names.clear();
         for (const auto& name : *opt_in_names) {
-            impl_->input_names.emplace_back(
-                static_cast<const std::string&>(name));
+            impl_->input_names.emplace_back(static_cast<const std::string&>(name));
         }
     }
     {
@@ -408,8 +402,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
         }
         impl_->output_names.clear();
         for (const auto& name : *opt_out_names) {
-            impl_->output_names.emplace_back(
-                static_cast<const std::string&>(name));
+            impl_->output_names.emplace_back(static_cast<const std::string&>(name));
         }
     }
 
@@ -486,8 +479,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
 
             // Use pre-computed info + quant params from BuildTensorInfos(),
             // no redundant getInputOutputBufferAttributes() call.
-            auto encoding = CreateEncoding(info.dtype, qp.scale,
-                                           qp.zero_point, qp.bandwidth);
+            auto encoding = CreateEncoding(info.dtype, qp.scale, qp.zero_point, qp.bandwidth);
             if (encoding == nullptr) {
                 ATLAS_LOGE("Unsupported input[%zu] dtype %d for UserBuffer",
                            i, static_cast<int>(info.dtype));
@@ -496,8 +488,8 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
             }
 
             const size_t element_size = ElementByteSize(info.dtype);
-            std::vector<size_t> stride = ComputeUserBufferStride(
-                info.shape, element_size);
+            std::vector<size_t> stride = ComputeUserBufferStride(info.shape,
+                                                                  element_size);
             const size_t buffer_size = stride.empty() ? 0 : stride[0] *
                 static_cast<size_t>(std::max(info.shape[0], 1));
 
@@ -542,8 +534,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
             impl_->user_input_raw.push_back(std::move(raw));
             impl_->user_input_buffers.push_back(std::move(user_buf));
             impl_->user_input_external.push_back(nullptr);
-            impl_->input_buffer_stride.push_back(
-                stride.empty() ? 0 : stride[0]);
+            impl_->input_buffer_stride.push_back(stride.empty() ? 0 : stride[0]);
         }
 
         // Create output UserBuffers.
@@ -558,8 +549,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
             const QuantParams& qp = output_quant_params_[i];
 
             // Use pre-computed info + quant params from BuildTensorInfos().
-            auto encoding = CreateEncoding(info.dtype, qp.scale,
-                                           qp.zero_point, qp.bandwidth);
+            auto encoding = CreateEncoding(info.dtype, qp.scale, qp.zero_point, qp.bandwidth);
             if (encoding == nullptr) {
                 ATLAS_LOGE("Unsupported output[%zu] dtype %d for UserBuffer",
                            i, static_cast<int>(info.dtype));
@@ -568,8 +558,8 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
             }
 
             const size_t element_size = ElementByteSize(info.dtype);
-            std::vector<size_t> stride = ComputeUserBufferStride(
-                info.shape, element_size);
+            std::vector<size_t> stride = ComputeUserBufferStride(info.shape,
+                                                                  element_size);
             const size_t buffer_size = stride.empty() ? 0 : stride[0] *
                 static_cast<size_t>(std::max(info.shape[0], 1));
 
@@ -596,8 +586,7 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
             impl_->user_output_encodings.push_back(std::move(encoding));
             impl_->user_output_raw.push_back(std::move(raw));
             impl_->user_output_buffers.push_back(std::move(user_buf));
-            impl_->output_buffer_stride.push_back(
-                stride.empty() ? 0 : stride[0]);
+            impl_->output_buffer_stride.push_back(stride.empty() ? 0 : stride[0]);
         }
     }
 
@@ -902,8 +891,7 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
     for (const auto& name : impl_->input_names) {
         auto opt_attrs = impl_->snpe->getInputOutputBufferAttributes(name.c_str());
         if (!opt_attrs || *opt_attrs == nullptr) {
-            ATLAS_LOGE("Failed to get input buffer attributes for tensor: %s",
-                       name.c_str());
+            ATLAS_LOGE("Failed to get input buffer attributes for tensor: %s", name.c_str());
             return utils::ErrorCode::kInferFailed;
         }
 
@@ -949,8 +937,7 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
     for (const auto& name : impl_->output_names) {
         auto opt_attrs = impl_->snpe->getInputOutputBufferAttributes(name.c_str());
         if (!opt_attrs || *opt_attrs == nullptr) {
-            ATLAS_LOGE("Failed to get output buffer attributes for tensor: %s",
-                       name.c_str());
+            ATLAS_LOGE("Failed to get output buffer attributes for tensor: %s", name.c_str());
             return utils::ErrorCode::kInferFailed;
         }
 

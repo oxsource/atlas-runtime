@@ -50,6 +50,8 @@
 - `unique_ptr` for ownership; `shared_ptr` only when truly shared
 - No bare `new`/`delete` in business logic (only in `Tensor` internals)
 - `Tensor` is move-only (copy deleted)
+- **Line length**: Follow Google C++ Style (`ColumnLimit=100`). Avoid unnecessary line breaks — function calls, return statements, and simple expressions that fit within 100 chars should stay on a single line. Reserve multi-line formatting only when the expression genuinely exceeds the limit.
+- **Reduce conditional nesting**: Use early `return` / `break` / `continue` to flatten deeply nested `if` blocks. Prefer guard clauses at the top of functions to handle edge cases and preconditions, keeping the main path at the outermost indentation level.
 
 ## Include Order (in .cc)
 

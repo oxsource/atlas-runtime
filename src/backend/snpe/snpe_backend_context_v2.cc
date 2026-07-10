@@ -42,8 +42,7 @@ utils::ErrorCode SnpeBackendContext::Init(
     (void)config;
 
     // 2.x: initializeLogging with LogLevel_t parameter.
-    if (!SNPE::SNPEFactory::initializeLogging(
-            DlSystem::LogLevel_t::LOG_WARN)) {
+    if (!SNPE::SNPEFactory::initializeLogging(DlSystem::LogLevel_t::LOG_WARN)) {
         ATLAS_LOGE("SNPE initializeLogging failed");
         return utils::ErrorCode::kInferFailed;
     }

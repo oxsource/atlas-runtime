@@ -40,18 +40,18 @@
 namespace {
 
 // ---------------------------------------------------------------------------
-// Fills a float32 NCHW tensor with a synthetic gradient pattern.
+// Fills a float32 NHWC tensor with a synthetic gradient pattern.
 // ---------------------------------------------------------------------------
-void FillGradientNCHW(float* data, int n, int c, int h, int w) {
+void FillGradientNHWC(float* data, int n, int h, int w, int c) {
     for (int cn = 0; cn < n; ++cn) {
-        for (int cc = 0; cc < c; ++cc) {
-            for (int ch = 0; ch < h; ++ch) {
-                for (int cw = 0; cw < w; ++cw) {
+        for (int ch = 0; ch < h; ++ch) {
+            for (int cw = 0; cw < w; ++cw) {
+                for (int cc = 0; cc < c; ++cc) {
                     const size_t idx =
-                        static_cast<size_t>(cn) * c * h * w +
-                        static_cast<size_t>(cc) * h * w +
-                        static_cast<size_t>(ch) * w +
-                        static_cast<size_t>(cw);
+                        static_cast<size_t>(cn) * h * w * c +
+                        static_cast<size_t>(ch) * w * c +
+                        static_cast<size_t>(cw) * c +
+                        static_cast<size_t>(cc);
                     data[idx] = static_cast<float>(idx + 1);
                 }
             }
@@ -165,10 +165,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    constexpr int kInN = 1, kInC = 3, kInH = 4, kInW = 4;
-    FillGradientNCHW(static_cast<float*>(input_a.data),
-                     kInN, kInC, kInH, kInW);
-    ATLAS_LOGD("Wrote %dx%dx%dx%d gradient to model_a buffer.", kInN, kInC, kInH, kInW);
+    constexpr int kInN = 1, kInH = 4, kInW = 4, kInC = 3;
+    FillGradientNHWC(static_cast<float*>(input_a.data),
+                     kInN, kInH, kInW, kInC);
+    ATLAS_LOGD("Wrote %dx%dx%dx%d gradient to model_a buffer.", kInN, kInH, kInW, kInC);
 
     // =====================================================================
     // Step 4: Verify that model_b sees the same data (shared memory)
