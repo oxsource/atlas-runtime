@@ -87,21 +87,18 @@ utils::ErrorCode ModelManager::Init(const ManifestConfig& manifest) {
         entry.profiler = std::move(profiler);
 
         // Build per-input preprocessing pipeline and per-output postprocessing
-        // pipeline. Priority: explicit pipeline array > disable_pipeline flag
-        // > auto-built input pipeline.
+        // pipeline.  A non-empty pipeline array is built unless
+        // disable_pipeline is set (quick toggle for debugging).
         for (const auto& input : model.inputs) {
-            if (!input.pipeline.empty()) {
+            if (!input.pipeline.empty() && !input.disable_pipeline) {
                 entry.input_pipelines.push_back(
                     pipeline::Pipeline::BuildFromManifest(input.pipeline));
-            } else if (input.disable_pipeline) {
-                entry.input_pipelines.push_back(pipeline::Pipeline{});  // identity
             } else {
-                entry.input_pipelines.push_back(
-                    pipeline::Pipeline::BuildInputPipeline(input.ToTensorInfo()));
+                entry.input_pipelines.push_back(pipeline::Pipeline{});  // identity
             }
         }
         for (const auto& output : model.outputs) {
-            if (!output.pipeline.empty()) {
+            if (!output.pipeline.empty() && !output.disable_pipeline) {
                 entry.output_pipelines.push_back(
                     pipeline::Pipeline::BuildOutputFromManifest(output.pipeline));
             } else {
@@ -182,21 +179,6 @@ utils::ErrorCode ModelManager::EnsureLoaded(ModelEntry* entry) {
                                      entry->config,
                                      ctx);
     if (ret == utils::ErrorCode::kOk) {
-        const auto backend_input_infos = entry->backend->GetInputInfo();
-        for (size_t i = 0; i < entry->config.inputs.size(); ++i) {
-            const auto& input = entry->config.inputs[i];
-            if (!input.pipeline.empty() || input.disable_pipeline) {
-                continue;
-            }
-            if (i < backend_input_infos.size()) {
-                auto target_info = backend_input_infos[i];
-                target_info.name = input.name;
-                target_info.has_normalize = input.has_normalize;
-                target_info.normalize = input.normalize;
-                entry->input_pipelines[i] =
-                    pipeline::Pipeline::BuildInputPipeline(target_info);
-            }
-        }
         entry->loaded = true;
         ATLAS_LOGD("model loaded successfully: %s", entry->config.id.c_str());
     } else {

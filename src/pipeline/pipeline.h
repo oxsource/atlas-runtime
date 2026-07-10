@@ -35,26 +35,12 @@ class Pipeline {
     utils::ErrorCode Run(const utils::Tensor& input,
                         utils::Tensor* output, const IPipelineNode::Context& ctx = {}) const;
 
-    // Builds a default input pre-processing pipeline from |target_info|.
-    //
-    // The pipeline converts a source image tensor (HWC uint8, BGR channel
-    // order) into the format described by |target_info|.  Nodes are added
-    // only when a transformation is actually required:
-    //
-    //   DtypeConvert  (uint8 → float32)
-    //   Resize        (H × W → target H × W, from NCHW shape[2] / shape[3])
-    //   BGRToRGB      (only when layout is NCHW and 3 channels)
-    //   HWCToCHW      (only when layout is NCHW)
-    //   Normalize     (only when target_info.has_normalize == true)
-    static Pipeline BuildInputPipeline(const utils::TensorInfo& target_info);
-
     // Builds a pipeline from explicit manifest node declarations.
     // Returns empty pipeline if any node name is unknown.
     static Pipeline BuildFromManifest(
         const std::vector<core::ManifestPipelineNode>& nodes);
 
-    // Builds an output post-processing pipeline from manifest declarations.
-    // Returns empty pipeline if nodes is empty or any node is unknown.
+    // Alias for BuildFromManifest used by output pipeline construction.
     static Pipeline BuildOutputFromManifest(
         const std::vector<core::ManifestPipelineNode>& nodes);
 

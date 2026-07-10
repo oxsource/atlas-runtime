@@ -193,7 +193,7 @@ utils::ErrorCode ParseTensorInfo(const nlohmann::json& j,
         }
     }
 
-    // Optional: when true, skip automatic BuildInputPipeline.
+    // Optional: when true, user data bypasses the pipeline (identity passthrough).
     if (j.contains(kKeyDisablePipeline) && j[kKeyDisablePipeline].is_boolean()) {
         info->disable_pipeline = j[kKeyDisablePipeline].get<bool>();
     }

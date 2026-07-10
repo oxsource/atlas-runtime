@@ -211,43 +211,6 @@ TEST(PipelineTest, EmptyPipelineBorrowsInput) {
     EXPECT_EQ(output.data, input.data);
 }
 
-TEST(PipelineTest, BuildInputPipelineProducesCorrectShape) {
-    utils::TensorInfo target;
-    target.dtype        = utils::DataType::kFloat32;
-    target.layout       = "NCHW";
-    target.shape        = {1, 3, 4, 4};
-    target.has_normalize = true;
-    target.normalize.mean = {0.485f, 0.456f, 0.406f};
-    target.normalize.std  = {0.229f, 0.224f, 0.225f};
-
-    Pipeline p = Pipeline::BuildInputPipeline(target);
-    EXPECT_FALSE(p.IsEmpty());
-
-    // Source: HWC uint8 4×4×3
-    auto input = MakeUint8HWC(4, 4, 3, 128);
-    utils::Tensor output;
-    ASSERT_EQ(p.Run(input, &output), utils::ErrorCode::kOk);
-
-    // After pipeline: CHW float32 3×4×4
-    ASSERT_EQ(output.info.shape.size(), 3u);
-    EXPECT_EQ(output.info.shape[0], 3);  // C
-    EXPECT_EQ(output.info.shape[1], 4);  // H
-    EXPECT_EQ(output.info.shape[2], 4);  // W
-    EXPECT_EQ(output.info.dtype, utils::DataType::kFloat32);
-}
-
-TEST(PipelineTest, NodeCountMatchesExpectedSteps) {
-    utils::TensorInfo target;
-    target.dtype        = utils::DataType::kFloat32;
-    target.layout       = "NCHW";
-    target.shape        = {1, 3, 8, 8};
-    target.has_normalize = false;
-
-    Pipeline p = Pipeline::BuildInputPipeline(target);
-    // DtypeConvert + Resize + BGRToRGB + HWCToCHW = 4 nodes (no Normalize).
-    EXPECT_EQ(p.NodeCount(), 4u);
-}
-
 }  // namespace
 }  // namespace pipeline
 }  // namespace atlas

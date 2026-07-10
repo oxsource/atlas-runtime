@@ -33,10 +33,11 @@ struct ManifestTensorInfo {
     std::string layout = "NCHW";
     bool has_normalize = false;
     utils::NormalizeParams normalize;
-    // When true, skip automatic BuildInputPipeline.  The user must either
-    // provide an explicit |pipeline| array or accept an identity pipeline.
+    // Quick toggle: when true, the pipeline list is ignored and identity
+    // passthrough is used instead.  Useful for debugging without removing
+    // the pipeline declaration.
     bool disable_pipeline = false;
-    // Optional: explicit pipeline node chain. Empty = auto-build.
+    // Optional: explicit pipeline node chain.  Empty = identity passthrough.
     std::vector<ManifestPipelineNode> pipeline;
 
     // Converts to a public TensorInfo (drops pipeline config).
