@@ -45,6 +45,13 @@ utils::ErrorCode ModelManager::Init(const ManifestConfig& manifest) {
                    model.id.c_str(), model.backend.c_str(),
                    model.load_strategy == LoadStrategy::kLazy ? "lazy" : "eager");
 
+        // Create Profiler first (profiling-enabled models only).
+        std::unique_ptr<backend::Profiler> profiler;
+        if (manifest.profile.enabled) {
+            profiler = std::make_unique<backend::Profiler>(manifest.profile, model.id);
+        }
+
+        // Create the raw backend instance.
         auto backend_instance = factory.Create(model.backend);
         if (backend_instance == nullptr) {
             ATLAS_LOGE("backend not found: %s", model.backend.c_str());
@@ -53,14 +60,19 @@ utils::ErrorCode ModelManager::Init(const ManifestConfig& manifest) {
         }
 
         // Wrap with ProfilingBackend if profiling is enabled.
-        if (manifest.profile.enabled) {
+        // ProfilingBackend receives a raw pointer to Profiler; the Profiler
+        // is later moved into ModelEntry, but unique_ptr::move preserves the
+        // object's address, so the raw pointer remains valid.
+        if (profiler) {
             backend_instance = std::make_unique<backend::ProfilingBackend>(
-                std::move(backend_instance), manifest.profile, model.id);
+                std::move(backend_instance), profiler.get());
         }
 
         ModelEntry entry;
         entry.config   = model;
         entry.backend  = std::move(backend_instance);
+        entry.profiler = std::move(profiler);
+        entry.profile  = manifest.profile;
         // Build per-input preprocessing pipeline and per-output postprocessing
         // pipeline. Priority: explicit pipeline array > disable_pipeline flag
         // > auto-built input pipeline.

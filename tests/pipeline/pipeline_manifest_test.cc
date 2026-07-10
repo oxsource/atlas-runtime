@@ -35,8 +35,8 @@ TEST(PipelineNodeFactoryTest, AllBuiltinNodesRegistered) {
 
     // Check that all expected node names are present.
     std::vector<std::string> expected = {
-        "dtype_convert", "resize", "bgr_to_rgb", "rgb_to_bgr",
-        "hwc_to_chw", "chw_to_hwc", "normalize", "softmax", "topk"
+        "atlas::dtype_convert", "atlas::resize", "atlas::bgr_to_rgb", "atlas::rgb_to_bgr",
+        "atlas::hwc_to_chw", "atlas::chw_to_hwc", "atlas::normalize", "atlas::softmax", "atlas::topk"
     };
 
     for (const auto& name : expected) {

@@ -19,7 +19,7 @@
 
 1. 通过一份清单文件配置两个独立的视觉模型；
 2. 使用 `AtlasRuntime` / `ModelHandle` 进行两个模型的组合推理；
-3. 覆盖 `Pipeline` 自动预处理、模型间结果传递、输出解析等完整流程。
+3. 覆盖 `Pipeline` 显式预处理（由 manifest pipeline 数组声明）、模型间结果传递、输出解析等完整流程。
 
 ---
 
@@ -32,7 +32,7 @@
         │
         ▼
 ┌────────────────────────┐
-│  Model 1: detector     │  ← Pipeline 自动完成 DtypeConvert / Resize /
+│  Model 1: detector     │  ← Pipeline 按 manifest pipeline 数组执行
 │  输入: [1,3,32,32]     │    BGRToRGB / HWCToCHW / Normalize
 │  输出: [1,3,32,32]     │
 └────────────┬───────────┘
@@ -140,8 +140,8 @@ atlas/
 | `detector` 的 `load_strategy: eager` | 程序启动时立即加载，确保首次推理无延迟 |
 | `classifier` 的 `load_strategy: lazy` | 首次调用 `GetModel` 时才加载，演示懒加载策略 |
 | 两个模型同为 `"backend": "cpu"` | `ModelManager` 只创建一份 `CpuBackendContext`（`Ort::Env`），共享使用 |
-| `detector` 配置了 `normalize` | `Pipeline::BuildInputPipeline()` 自动插入 `NormalizeNode` |
-| `classifier` 无 `normalize` | 管线仅做类型转换 + 布局转换 |
+| `detector` 配置了 `pipeline` 含 `normalize` | `Pipeline::BuildFromManifest()` 按 manifest 声明构建节点链 |
+| `classifier` 无 `pipeline` | 无管线（identity 直通） |
 
 ---
 
@@ -236,7 +236,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Print model I/O metadata exposed via Pipeline + Backend.
+    // Print model I/O metadata exposed via Backend.
     const auto det_inputs = detector.GetInputInfo();
     std::cout << "[detector] input: " << det_inputs[0].name
               << "  shape: [";
@@ -251,13 +251,14 @@ int main(int argc, char* argv[]) {
               << " BGR image (HWC uint8).\n";
 
     // ── Step 4: Run detector ──────────────────────────────────────────────
-    // Pipeline automatically executes:
+    // Pipeline executes nodes declared in manifest's pipeline array:
     //   DtypeConvert(uint8→float32)
     //   → Resize(32×32)  [no-op here since source is already 32×32]
     //   → BGRToRGB
     //   → HWCToCHW
     //   → Normalize(ImageNet mean/std)
     // Then calls CpuBackend::Infer().
+    // Profile records are emitted for each phase: input_pipeline / forward / output_pipeline.
     std::vector<atlas::utils::Tensor> det_outputs;
     ret = detector.Run(raw_image, &det_outputs);
     if (ret != atlas::utils::ErrorCode::kOk) {
@@ -418,9 +419,10 @@ bazel build //examples/two_model_pipeline:two_model_pipeline
 
 ## 九、Pipeline 行为说明
 
-下图展示 `detector` 模型的完整数据流（`classifier` 同理，无 Normalize 节点）：
+下图展示 `detector` 模型的完整数据流（`classifier` 无 pipeline，数据直通推理）：
 
 ```
+
 raw_image (HWC uint8, 32×32×3)
         │
         ▼ DtypeConvertNode (uint8 → float32, cast only)
@@ -435,16 +437,22 @@ float32 HWC, 32×32×3, RGB order
         ▼ HWCToCHWNode ([H,W,C] → [C,H,W])
 float32 CHW, 3×32×32
         │
-        ▼ ModelHandle::Run() 插入 batch dim → [1,3,32,32]
+        ▼ ModelHandle::Run() 处理 3-D→4-D 转换并记录 input_pipeline 耗时
         │
         ▼ NormalizeNode  (x/255 − mean) / std   ← detector 专属
 float32 NCHW, [1,3,32,32],  values ∈ [-2.1, 2.6]
         │
-        ▼ CpuBackend::Infer()
+        ▼ CpuBackend::Infer()  (记录 forward 耗时)
 output: float32 NCHW [1,3,32,32]
 ```
 
-> `classifier` 不含 `normalize`，数据在 HWCToCHW 后直接进入推理，值域仍为 [0, 255]。
+每个 `ModelHandle::Run()` 调用产生三条 Profile 记录：
+
+| step | 说明 |
+|------|------|
+| `input_pipeline` | 管线预处理总耗时 |
+| `forward` | CpuBackend::Infer() 推理耗时 |
+| `output_pipeline` | 管线后处理总耗时（本例无后处理） |
 
 ---
 
@@ -455,8 +463,8 @@ output: float32 NCHW [1,3,32,32]
 | `ManifestParser` | `AtlasRuntime::Init()` 内部解析 `manifest.json` |
 | `ModelManager` | 按类型创建一份 `CpuBackendContext`，管理两个 `ModelEntry` |
 | `IBackendContext` / `CpuBackendContext` | 两个模型共享同一 `Ort::Env` |
-| `Pipeline::BuildInputPipeline()` | 从清单 inputs[0] 自动构建预处理节点链 |
-| `ModelHandle::Run()` | 封装 Pipeline + Infer 完整链路，对外一行调用 |
+| `Pipeline::BuildFromManifest()` | 从清单 pipeline 数组显式构建预处理节点链 |
+| `ModelHandle::Run()` | 封装 Pipeline + Infer，内部分三阶段 profile 统计 |
 | `ErrorCode` | 所有调用结果通过返回值检查，无异常 |
 
 ---
@@ -605,7 +613,7 @@ const char* VersionString();
 ### Added
 - ManifestParser: JSON manifest parsing with env-var expansion
 - CpuBackend: ONNX Runtime 1.17.3 CPU inference
-- Pipeline: DtypeConvert / Resize / BGRToRGB / HWCToCHW / Normalize nodes
+- Pipeline: DtypeConvert / Resize / BGRToRGB / HWCToCHW / Normalize nodes + BuildFromManifest()
 - ModelManager: eager/lazy loading, shared BackendContext per type
 - AtlasRuntime / ModelHandle: unified public API
 - examples/two_model_pipeline: dual-model inference demo

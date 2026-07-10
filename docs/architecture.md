@@ -137,9 +137,12 @@ manifest.yaml
 
 ### 3.5 预处理/后处理管线（Pipeline）
 
-- 根据清单 inputs/outputs 描述自动生成默认管线；
+- 根据清单 inputs/outputs 中声明的 `pipeline` 数组显式构建，**无自动构建逻辑**；
 - 内置常见预处理节点：Resize、Normalize、HWC→CHW、BGR→RGB、数据类型转换等；
-- 支持用户自定义管线节点插入，满足特殊模型需求。
+- **开放** `ATLAS_REGISTER_PIPELINE_NODE` 宏，用户可注册任意自定义节点，manifest 中按 name 引用；
+- **节点命名空间**：内置节点使用 `atlas::` 前缀（如 `atlas::resize`），用户节点使用自定义前缀（如 `mycompany::augment`），避免命名冲突；
+- **`IPipelineNode::Context` 上下文**：`IPipelineNode::Process()` 接收 `Context`（作为首个参数，`IPipelineNode` 嵌套类型），携带 `config`（模型配置）、`backend`（`IBackend*`，用于零拷贝访问后端缓冲区）、`input_index` / `output_index`、`flags`（位掩码）、`args`（用户扩展数据指针）等链式调用常见上下文；
+- 管线执行在 `ModelHandle::Run()` 内部，输出分阶段 Profile 统计（input_pipeline / forward / output_pipeline 三段耗时）。
 
 ### 3.6 统一接口层（Atlas API）
 

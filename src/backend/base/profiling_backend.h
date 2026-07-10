@@ -1,37 +1,20 @@
 #pragma once
 
 #include <memory>
-#include <string>
-#include <vector>
 
 #include "src/backend/base/i_backend.h"
-#include "src/core/manifest_config.h"
-#include "src/utils/types.h"
+#include "src/profiler/profiler.h"
 
 namespace atlas {
 namespace backend {
 
-// One profiled timing event.
-struct ProfileRecord {
-    std::string model_id;
-    std::string phase;
-    std::string step;
-    double      duration_ms;
-    int64_t     timestamp_ms;
-};
-
-// Decorator that wraps an IBackend and records timing for Load / Infer / Unload.
+// ── ProfilingBackend ─────────────────────────────────────────
 //
-// Profiling is enabled via the top-level "profile" section in the manifest.
-// Timing data is output as CSV (to stdout or a file) for post-analysis.
-//
-// All pure-query methods (GetInputInfo, IsLoaded, Version, etc.) are forwarded
-// directly to the inner backend without profiling overhead.
+// Decorator that wraps an IBackend and records timing for Load / Infer / Unload
+// via the Profiler owned by ModelEntry.
 class ProfilingBackend : public IBackend {
  public:
-    ProfilingBackend(std::unique_ptr<IBackend> inner,
-                     core::ProfileConfig config,
-                     std::string model_id);
+    ProfilingBackend(std::unique_ptr<IBackend> inner, Profiler* profiler);
     ~ProfilingBackend() override;
 
     utils::ErrorCode Load(const std::string& model_path,
@@ -50,21 +33,10 @@ class ProfilingBackend : public IBackend {
     std::string Version() const override;
 
  private:
-    // Checks whether the given phase should be profiled based on modules config.
     bool ShouldProfile(const std::string& phase) const;
 
-    // Records one timing entry.
-    void Record(const std::string& phase, const std::string& step,
-                double duration_ms, int64_t timestamp_ms);
-
-    // Flushes all buffered records to the output (file or stdout).
-    void Flush();
-
-    std::unique_ptr<IBackend>      inner_;
-    core::ProfileConfig            config_;
-    std::string                    model_id_;
-    std::vector<ProfileRecord>     records_;
-    bool                           header_written_ = false;
+    std::unique_ptr<IBackend> inner_;
+    Profiler*                 profiler_;   // non-owning
 };
 
 }  // namespace backend

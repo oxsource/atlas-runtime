@@ -7,5 +7,7 @@
 #include "atlas/atlas_runtime.h"
 #include "atlas/logger.h"
 #include "atlas/model_handle.h"
+#include "atlas/pipeline_node.h"
+#include "atlas/pipeline_registry.h"
 #include "atlas/types.h"
 #include "atlas/version.h"

@@ -14,19 +14,19 @@
 #include "src/utils/strings.h"
 #include "src/utils/types.h"
 
+namespace {
+constexpr std::string_view kNodeName = "atlas::topk";
+}  // namespace
+
 namespace atlas {
 namespace pipeline {
-
-namespace {
-constexpr std::string_view kNodeName = "TopK";
-}  // namespace
 
 TopKNode::TopKNode(int k) : k_(k) {}
 
 std::string_view TopKNode::Name() const { return kNodeName; }
 
-utils::ErrorCode TopKNode::Process(const utils::Tensor& input,
-                                    utils::Tensor* output) {
+utils::ErrorCode TopKNode::Process(const Context& ctx,
+                                  const utils::Tensor& input, utils::Tensor* output) {
     if (output == nullptr) return utils::ErrorCode::kInvalidArgument;
     if (input.info.dtype != utils::DataType::kFloat32) {
         return utils::ErrorCode::kInvalidArgument;
@@ -95,4 +95,5 @@ std::unique_ptr<IPipelineNode> TopKNode::CreateFromParams(
 }  // namespace pipeline
 }  // namespace atlas
 
-ATLAS_REGISTER_PIPELINE_NODE("topk", atlas::pipeline::TopKNode)
+ATLAS_REGISTER_PIPELINE_NODE(kNodeName, atlas::pipeline::TopKNode)
+

@@ -5,6 +5,7 @@ cc_library(
     alwayslink = 1,
     deps = [
         "//src/core:model_manager",
+        "//src/profiler:profiler",
         "//src/utils:types",
     ],
     visibility = ["//visibility:public"],

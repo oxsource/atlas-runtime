@@ -4,23 +4,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include "src/profiler/profile_config.h"
 #include "src/utils/types.h"
 
 namespace atlas {
 namespace core {
-
-// Profiling configuration parsed from the top-level "profile" section of the
-// manifest.  All models share the same profiling settings.
-struct ProfileConfig {
-    bool        enabled     = false;
-    std::string output_path;           // Empty → stdout.
-    std::string modules     = "load,infer";  // Comma-separated: load,infer,unload,all
-};
-
-inline bool ProfileModulesContain(const std::string& modules,
-                                   const std::string& phase) {
-    return modules == "all" || modules.find(phase) != std::string::npos;
-}
 
 // Model loading strategy declared in the manifest.
 enum class LoadStrategy {

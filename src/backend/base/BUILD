@@ -34,9 +34,7 @@ cc_library(
     hdrs = ["profiling_backend.h"],
     deps = [
         ":i_backend",
-        "//src/core:manifest_config",
-        "//src/utils:logger",
-        "//src/utils:types",
+        "//src/profiler:profiler",
     ],
     visibility = ["//visibility:public"],
 )

@@ -11,17 +11,27 @@ PipelineNodeFactory& PipelineNodeFactory::Instance() {
     return instance;
 }
 
-void PipelineNodeFactory::Register(const std::string& name,
+void PipelineNodeFactory::Register(std::string_view name,
                                      NodeCreator creator) {
-    creators_[name] = std::move(creator);
+    creators_[std::string(name)] = std::move(creator);
 }
 
 std::unique_ptr<IPipelineNode> PipelineNodeFactory::Create(
     const std::string& name,
     const std::unordered_map<std::string, std::string>& params) const {
+    // 1. Exact match.
     auto it = creators_.find(name);
-    if (it == creators_.end()) return nullptr;
-    return it->second(params);
+    if (it != creators_.end()) return it->second(params);
+
+    // 2. If the name already has a namespace prefix, don't fallback.
+    if (name.find("::") != std::string::npos) return nullptr;
+
+    // 3. Unprefixed name: try atlas:: prefix as fallback.
+    const std::string prefixed = std::string("atlas::") + name;
+    it = creators_.find(prefixed);
+    if (it != creators_.end()) return it->second(params);
+
+    return nullptr;
 }
 
 std::vector<std::string> PipelineNodeFactory::ListNodeNames() const {

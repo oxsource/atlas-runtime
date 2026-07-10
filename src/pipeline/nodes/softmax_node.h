@@ -23,8 +23,8 @@ class SoftmaxNode : public IPipelineNode {
     // |axis| follows NumPy semantics: negative values count from the end.
     explicit SoftmaxNode(int axis = -1);
 
-    utils::ErrorCode Process(const utils::Tensor& input,
-                              utils::Tensor* output) override;
+    utils::ErrorCode Process(const Context& ctx,
+                            const utils::Tensor& input, utils::Tensor* output) override;
     std::string_view Name() const override;
     bool SupportsInPlace() const override { return true; }
 
@@ -39,3 +39,4 @@ class SoftmaxNode : public IPipelineNode {
 
 }  // namespace pipeline
 }  // namespace atlas
+

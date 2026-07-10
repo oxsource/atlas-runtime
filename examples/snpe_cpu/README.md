@@ -75,7 +75,7 @@ Runtime released. Done.
 |---|---|
 | `AtlasRuntime::Init()` | Parses manifest, creates shared `SnpeBackendContext` |
 | `AtlasRuntime::GetModel()` | Obtains `ModelHandle` for SNPE model |
-| `Pipeline::BuildInputPipeline()` | Auto-built from SNPE runtime tensor info: DtypeConvert -> Resize -> BGRToRGB |
+| `Pipeline::BuildFromManifest()` | Built from manifest pipeline array: DtypeConvert -> Resize -> BGRToRGB |
 | `SnpeBackend::Load()` | Loads `.dlc` container, builds SNPE network with CPU runtime |
 | `SnpeBackend::Infer()` | Executes inference via SNPE CPU_FLOAT32 |
 | `ModelHandle::Run()` | One-call preprocessing + inference |

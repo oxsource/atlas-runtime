@@ -57,7 +57,7 @@
 |------|------|------|
 | core | `ManifestParser` / `ManifestConfig` / `ModelConfig` / `ModelManager` / `ModelEntry` | 实现细节，由 `AtlasRuntime` 内部持有 |
 | backend | `IBackend` / `IBackendContext` / `BackendFactory` / `CpuBackend` | 后端插件机制，外部仅需通过 manifest 声明 backend |
-| pipeline | `Pipeline` / `IPipelineNode` / 各 Node 子类 | 预处理管线由 manifest 自动构建，无需外部直接操作 |
+| pipeline | `Pipeline` / `IPipelineNode` / 各 Node 子类 | 预处理管线由 manifest `pipeline` 数组显式声明，无需外部直接操作 |
 | backend | `ATLAS_REGISTER_BACKEND` / `ATLAS_REGISTER_BACKEND_CONTEXT` 宏 | 仅在编译自有后端扩展时使用，见阶段四 |
 
 ### 2.3 三方库类型隔离要求

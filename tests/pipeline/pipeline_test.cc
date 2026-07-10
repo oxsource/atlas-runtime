@@ -56,7 +56,7 @@ TEST(DtypeConvertNodeTest, Uint8ToFloat32CastsValues) {
 
     DtypeConvertNode node(utils::DataType::kFloat32);
     utils::Tensor output;
-    ASSERT_EQ(node.Process(input, &output), utils::ErrorCode::kOk);
+    ASSERT_EQ(node.Process({}, input, &output), utils::ErrorCode::kOk);
 
     EXPECT_EQ(output.info.dtype, utils::DataType::kFloat32);
     const float* data = static_cast<const float*>(output.data);
@@ -69,7 +69,7 @@ TEST(DtypeConvertNodeTest, SameDtypeReturnsBorrowedTensor) {
 
     DtypeConvertNode node(utils::DataType::kFloat32);
     utils::Tensor output;
-    ASSERT_EQ(node.Process(input, &output), utils::ErrorCode::kOk);
+    ASSERT_EQ(node.Process({}, input, &output), utils::ErrorCode::kOk);
     // Borrowed: no allocation.
     EXPECT_EQ(output.data, input.data);
     EXPECT_FALSE(output.owns_data);
@@ -77,7 +77,7 @@ TEST(DtypeConvertNodeTest, SameDtypeReturnsBorrowedTensor) {
 
 TEST(DtypeConvertNodeTest, NameIsCorrect) {
     DtypeConvertNode node(utils::DataType::kFloat32);
-    EXPECT_EQ(node.Name(), "DtypeConvert");
+    EXPECT_EQ(node.Name(), "atlas::dtype_convert");
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ TEST(ResizeNodeTest, ResizesUint8HWC) {
 
     ResizeNode node(2, 2);
     utils::Tensor output;
-    ASSERT_EQ(node.Process(input, &output), utils::ErrorCode::kOk);
+    ASSERT_EQ(node.Process({}, input, &output), utils::ErrorCode::kOk);
 
     ASSERT_EQ(output.info.shape.size(), 3u);
     EXPECT_EQ(output.info.shape[0], 2);
@@ -109,7 +109,7 @@ TEST(ResizeNodeTest, ResizesFloat32HWC) {
 
     ResizeNode node(2, 2);
     utils::Tensor output;
-    ASSERT_EQ(node.Process(input, &output), utils::ErrorCode::kOk);
+    ASSERT_EQ(node.Process({}, input, &output), utils::ErrorCode::kOk);
     EXPECT_EQ(output.info.shape[0], 2);
     EXPECT_EQ(output.info.shape[1], 2);
 }
@@ -127,7 +127,7 @@ TEST(BGRToRGBNodeTest, SwapsChannels) {
 
     BGRToRGBNode node;
     utils::Tensor output;
-    ASSERT_EQ(node.Process(input, &output), utils::ErrorCode::kOk);
+    ASSERT_EQ(node.Process({}, input, &output), utils::ErrorCode::kOk);
 
     const uint8_t* out = static_cast<const uint8_t*>(output.data);
     EXPECT_EQ(out[0], 30u);  // R
@@ -139,7 +139,7 @@ TEST(BGRToRGBNodeTest, RejectsNon3ChannelInput) {
     auto input = MakeUint8HWC(2, 2, 1, 0);
     BGRToRGBNode node;
     utils::Tensor output;
-    EXPECT_NE(node.Process(input, &output), utils::ErrorCode::kOk);
+    EXPECT_NE(node.Process({}, input, &output), utils::ErrorCode::kOk);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ TEST(HWCToCHWNodeTest, TransposesLayout) {
 
     HWCToCHWNode node;
     utils::Tensor output;
-    ASSERT_EQ(node.Process(input, &output), utils::ErrorCode::kOk);
+    ASSERT_EQ(node.Process({}, input, &output), utils::ErrorCode::kOk);
 
     ASSERT_EQ(output.info.shape.size(), 3u);
     EXPECT_EQ(output.info.shape[0], 3);  // C
@@ -185,7 +185,7 @@ TEST(NormalizeNodeTest, NormalizesValues) {
     NormalizeNode node(mean, std);
 
     utils::Tensor output;
-    ASSERT_EQ(node.Process(input, &output), utils::ErrorCode::kOk);
+    ASSERT_EQ(node.Process({}, input, &output), utils::ErrorCode::kOk);
 
     const float* out = static_cast<const float*>(output.data);
     // (255/255 - 0.5) / 0.5 = (1.0 - 0.5) / 0.5 = 1.0
@@ -196,7 +196,7 @@ TEST(NormalizeNodeTest, RejectsNonFloat32Input) {
     auto input = MakeUint8HWC(1, 1, 1, 128);
     NormalizeNode node({0.5f}, {0.5f});
     utils::Tensor output;
-    EXPECT_NE(node.Process(input, &output), utils::ErrorCode::kOk);
+    EXPECT_NE(node.Process({}, input, &output), utils::ErrorCode::kOk);
 }
 
 // ---------------------------------------------------------------------------

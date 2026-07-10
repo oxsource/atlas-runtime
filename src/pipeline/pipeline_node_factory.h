@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -28,7 +29,7 @@ class PipelineNodeFactory {
 
     // Registers a node creator under |name|.
     // If |name| is already registered, the previous entry is replaced.
-    void Register(const std::string& name, NodeCreator creator);
+    void Register(std::string_view name, NodeCreator creator);
 
     // Creates a new node instance for |name| with |params|.
     // Returns nullptr if |name| has not been registered.

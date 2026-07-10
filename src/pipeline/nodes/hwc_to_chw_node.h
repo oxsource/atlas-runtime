@@ -17,8 +17,8 @@ class HWCToCHWNode : public IPipelineNode {
  public:
     HWCToCHWNode() = default;
 
-    utils::ErrorCode Process(const utils::Tensor& input,
-                              utils::Tensor* output) override;
+    utils::ErrorCode Process(const Context& ctx,
+                            const utils::Tensor& input, utils::Tensor* output) override;
     std::string_view Name() const override;
 
     // Creates a node from manifest params. No params required.
@@ -28,3 +28,4 @@ class HWCToCHWNode : public IPipelineNode {
 
 }  // namespace pipeline
 }  // namespace atlas
+

@@ -17,8 +17,8 @@ class DtypeConvertNode : public IPipelineNode {
  public:
     explicit DtypeConvertNode(utils::DataType target_dtype);
 
-    utils::ErrorCode Process(const utils::Tensor& input,
-                              utils::Tensor* output) override;
+    utils::ErrorCode Process(const Context& ctx,
+                            const utils::Tensor& input, utils::Tensor* output) override;
     std::string_view Name() const override;
 
     // Creates a node from manifest params. Required key: "target".
@@ -31,3 +31,4 @@ class DtypeConvertNode : public IPipelineNode {
 
 }  // namespace pipeline
 }  // namespace atlas
+

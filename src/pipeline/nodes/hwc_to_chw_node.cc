@@ -6,17 +6,17 @@
 #include "src/pipeline/pipeline_node_factory.h"
 #include "src/utils/types.h"
 
+namespace {
+constexpr std::string_view kNodeName = "atlas::hwc_to_chw";
+}  // namespace
+
 namespace atlas {
 namespace pipeline {
 
-namespace {
-constexpr std::string_view kNodeName = "HWCToCHW";
-}  // namespace
-
 std::string_view HWCToCHWNode::Name() const { return kNodeName; }
 
-utils::ErrorCode HWCToCHWNode::Process(const utils::Tensor& input,
-                                        utils::Tensor* output) {
+utils::ErrorCode HWCToCHWNode::Process(const Context& ctx,
+                                      const utils::Tensor& input, utils::Tensor* output) {
     if (output == nullptr) return utils::ErrorCode::kInvalidArgument;
     if (input.info.shape.size() != 3) return utils::ErrorCode::kInvalidArgument;
 
@@ -62,4 +62,5 @@ std::unique_ptr<IPipelineNode> HWCToCHWNode::CreateFromParams(
 }  // namespace pipeline
 }  // namespace atlas
 
-ATLAS_REGISTER_PIPELINE_NODE("hwc_to_chw", atlas::pipeline::HWCToCHWNode)
+ATLAS_REGISTER_PIPELINE_NODE(kNodeName, atlas::pipeline::HWCToCHWNode)
+

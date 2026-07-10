@@ -8,18 +8,21 @@
 #include "src/pipeline/pipeline_node_factory.h"
 #include "src/utils/types.h"
 
+namespace {
+constexpr std::string_view kNodeName = "atlas::bgr_to_rgb";
+}  // namespace
+
 namespace atlas {
 namespace pipeline {
 
 namespace {
-constexpr std::string_view kNodeName      = "BGRToRGB";
-constexpr int              kRequiredChans = 3;
+constexpr int kRequiredChans = 3;
 }  // namespace
 
 std::string_view BGRToRGBNode::Name() const { return kNodeName; }
 
-utils::ErrorCode BGRToRGBNode::Process(const utils::Tensor& input,
-                                        utils::Tensor* output) {
+utils::ErrorCode BGRToRGBNode::Process(const Context& ctx,
+                                      const utils::Tensor& input, utils::Tensor* output) {
     if (output == nullptr) return utils::ErrorCode::kInvalidArgument;
     if (input.info.shape.size() != 3) return utils::ErrorCode::kInvalidArgument;
     if (input.info.shape[2] != kRequiredChans) {
@@ -72,4 +75,5 @@ std::unique_ptr<IPipelineNode> BGRToRGBNode::CreateFromParams(
 }  // namespace pipeline
 }  // namespace atlas
 
-ATLAS_REGISTER_PIPELINE_NODE("bgr_to_rgb", atlas::pipeline::BGRToRGBNode)
+ATLAS_REGISTER_PIPELINE_NODE(kNodeName, atlas::pipeline::BGRToRGBNode)
+

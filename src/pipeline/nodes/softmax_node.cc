@@ -13,19 +13,19 @@
 #include "src/utils/strings.h"
 #include "src/utils/types.h"
 
+namespace {
+constexpr std::string_view kNodeName = "atlas::softmax";
+}  // namespace
+
 namespace atlas {
 namespace pipeline {
-
-namespace {
-constexpr std::string_view kNodeName = "Softmax";
-}  // namespace
 
 SoftmaxNode::SoftmaxNode(int axis) : axis_(axis) {}
 
 std::string_view SoftmaxNode::Name() const { return kNodeName; }
 
-utils::ErrorCode SoftmaxNode::Process(const utils::Tensor& input,
-                                       utils::Tensor* output) {
+utils::ErrorCode SoftmaxNode::Process(const Context& ctx,
+                                     const utils::Tensor& input, utils::Tensor* output) {
     if (output == nullptr) return utils::ErrorCode::kInvalidArgument;
     if (input.info.dtype != utils::DataType::kFloat32) {
         return utils::ErrorCode::kInvalidArgument;
@@ -121,4 +121,5 @@ std::unique_ptr<IPipelineNode> SoftmaxNode::CreateFromParams(
 }  // namespace pipeline
 }  // namespace atlas
 
-ATLAS_REGISTER_PIPELINE_NODE("softmax", atlas::pipeline::SoftmaxNode)
+ATLAS_REGISTER_PIPELINE_NODE(kNodeName, atlas::pipeline::SoftmaxNode)
+

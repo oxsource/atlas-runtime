@@ -9,20 +9,20 @@
 #include "src/pipeline/pipeline_node_factory.h"
 #include "src/utils/types.h"
 
+namespace {
+constexpr std::string_view kNodeName = "atlas::dtype_convert";
+}  // namespace
+
 namespace atlas {
 namespace pipeline {
-
-namespace {
-constexpr std::string_view kNodeName = "DtypeConvert";
-}  // namespace
 
 DtypeConvertNode::DtypeConvertNode(utils::DataType target_dtype)
     : target_dtype_(target_dtype) {}
 
 std::string_view DtypeConvertNode::Name() const { return kNodeName; }
 
-utils::ErrorCode DtypeConvertNode::Process(const utils::Tensor& input,
-                                            utils::Tensor* output) {
+utils::ErrorCode DtypeConvertNode::Process(const Context& ctx,
+                                          const utils::Tensor& input, utils::Tensor* output) {
     if (output == nullptr) return utils::ErrorCode::kInvalidArgument;
 
     // If no conversion needed, shallow-copy metadata and reuse buffer.
@@ -83,4 +83,5 @@ std::unique_ptr<IPipelineNode> DtypeConvertNode::CreateFromParams(
 }  // namespace pipeline
 }  // namespace atlas
 
-ATLAS_REGISTER_PIPELINE_NODE("dtype_convert", atlas::pipeline::DtypeConvertNode)
+ATLAS_REGISTER_PIPELINE_NODE(kNodeName, atlas::pipeline::DtypeConvertNode)
+

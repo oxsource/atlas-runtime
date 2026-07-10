@@ -96,13 +96,31 @@ Load() 退出
 
 #### Infer 阶段（`profile_modules` 含 `infer`）
 
+`ModelHandle::Run()` 层面增加 **分阶段统计**（不在 `ProfilingBackend` 中），`Infer()` 内部的子步骤由 `ProfilingBackend` 统计：
+
 ```
-Infer() 进入
-  ├── [step] 输入数据拷贝（预分配 ITensor 填充）
-  ├── [step] 模型执行 (snpe->execute / session->Run)
-  └── [step] 输出数据组装（零拷贝包装）
-Infer() 退出
+ModelHandle::Run() 进入
+  ├── [step] input_pipeline     ← Pipeline 预处理（由 ModelHandle 直接计时，非 ProfilingBackend）
+  ├── [step] forward            ← IBackend::Infer()（ProfilingBackend 进一步拆分为子步骤）
+  │   ├── [sub-step] 输入数据拷贝（预分配 ITensor 填充）
+  │   ├── [sub-step] 模型执行 (snpe->execute / session->Run)
+  │   └── [sub-step] 输出数据组装（零拷贝包装）
+  └── [step] output_pipeline    ← Pipeline 后处理（由 ModelHandle 直接计时）
+ModelHandle::Run() 退出
 ```
+
+输出示例：
+
+```csv
+model_id,phase,step,duration_ms,timestamp
+face_detection,infer,input_pipeline,0.123,1720500001000
+face_detection,infer,input_copy,1.234,1720500001001      ← ProfilingBackend
+face_detection,infer,execute,45.678,1720500001023
+face_detection,infer,output_wrap,0.056,1720500001079
+face_detection,infer,output_pipeline,0.045,1720500001080
+```
+
+> **设计要点**：`ProfilingBackend` 只负责 `IBackend` 接口的计时。管线阶段的耗时由 `ModelHandle::Run()` 自身负责记录，两者复用 `ProfileRecord` 结构体和 CSV 输出格式。
 
 #### Unload 阶段（`profile_modules` 含 `unload`）
 
@@ -214,6 +232,7 @@ std::unique_ptr<IBackend> BackendFactory::Create(
 | `src/core/manifest_config.h` | **新增**：`ProfileConfig` 结构体，在 `ManifestConfig` 中添加 `std::optional<ProfileConfig> profile` |
 | `src/core/manifest_config.cc` | **修改**：解析 manifest 顶层 `"profile"` 节，填充 `ProfileConfig` |
 | `src/core/model_manager.cc` | **修改**：创建 backend 后检查 `profile.enabled`，条件性包装 `ProfilingBackend` |
+| `src/api/model_handle.cc` | **修改**：`ModelHandle::Run()` 中增加 input_pipeline / forward / output_pipeline 三阶段分时记录 |
 | `manifest/` | 更新示例 manifest 添加 `"profile"` 配置节 |
 
 ---

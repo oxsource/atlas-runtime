@@ -7,6 +7,7 @@
 
 #include "src/backend/base/i_backend.h"
 #include "src/backend/base/i_backend_context.h"
+#include "src/profiler/profiler.h"
 #include "src/core/manifest_config.h"
 #include "src/pipeline/pipeline.h"
 #include "src/utils/types.h"
@@ -18,8 +19,10 @@ namespace core {
 struct ModelEntry {
     ModelConfig                            config;
     std::unique_ptr<backend::IBackend>     backend;
+    std::unique_ptr<backend::Profiler>     profiler;        // NEW: unified profiler
     std::vector<pipeline::Pipeline>        input_pipelines;   // one per input
     std::vector<pipeline::Pipeline>        output_pipelines;  // one per output
+    ProfileConfig                          profile;           // profiling config
     bool                                   loaded = false;
 };
 

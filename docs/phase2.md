@@ -12,7 +12,7 @@
 | CPU Backend | 基于 ONNX Runtime 的 `IBackend` 实现，可在 CPU 上执行 .onnx 模型推理 |
 | Pipeline 框架 | `IPipelineNode` 抽象接口 + `Pipeline` 编排类 |
 | 内置预处理节点 | Resize、Normalize、HWC→CHW、BGR→RGB、DtypeConvert |
-| Pipeline 自动构建 | 从 `TensorInfo`（清单描述）自动生成默认预处理管线 |
+| Pipeline 清单构建 | 从 manifest `pipeline` 数组显式构建预处理管线（无自动构建） |
 | 端到端集成测试 | 清单解析 → 模型加载 → 预处理 → 推理 → 验证输出形状 |
 
 ---
@@ -142,14 +142,33 @@ src/pipeline/
 namespace atlas {
 namespace pipeline {
 
+// ──── 执行上下文 Flags ──────────────────────────────────
+constexpr uint8_t kPipeFlagNone       = 0x00;  // 无特殊标记
+constexpr uint8_t kPipeFlagInputPipe  = 0x01;  // 运行在 input pipeline 阶段
+constexpr uint8_t kPipeFlagOutputPipe = 0x02;  // 运行在 output pipeline 阶段
+// Bits 2-7: 保留给用户自定义 flag
+
+// ──── IPipelineNode 定义，Context 作为嵌套类型 ──────────
 class IPipelineNode {
  public:
+    // 节点执行上下文，Pipeline::Run() 遍历节点链时传入每个 Process()
+    struct Context {
+        const core::ModelConfig*  config   = nullptr;  // 模型 manifest 配置
+        const backend::IBackend*  backend  = nullptr;  // 后端，用于零拷贝访问输入缓冲区
+        size_t                    input_index  = 0;  // Current input index
+        size_t                    output_index = 0;  // Current output index
+        uint8_t                   flags    = 0;        // 位掩码，见 kPipeFlag*
+        void*                     args     = nullptr;  // 用户自定义扩展数据
+    };
+
     virtual ~IPipelineNode() = default;
 
     // Processes one tensor in-place or produces a new output tensor.
     // Input and output may point to the same Tensor only if the node
     // declares in-place support via SupportsInPlace().
-    virtual utils::ErrorCode Process(const utils::Tensor& input,
+    // |ctx| provides access to the model config, backend buffer, and I/O index.
+    virtual utils::ErrorCode Process(const Context& ctx,
+                                      const utils::Tensor& input,
                                       utils::Tensor* output) = 0;
 
     virtual std::string_view Name() const = 0;
@@ -172,14 +191,15 @@ class Pipeline {
     void AddNode(std::unique_ptr<IPipelineNode> node);
 
     // Runs all nodes sequentially.  Input flows through each node in order.
-    // |scratch| is used as intermediate buffer between nodes.
+    // |ctx| is forwarded to every node's Process() call.
     utils::ErrorCode Run(const utils::Tensor& input,
-                          utils::Tensor* output) const;
+                          utils::Tensor* output,
+                          const IPipelineNode::Context& ctx = {}) const;
 
-    // Builds a default input preprocessing pipeline from TensorInfo.
-    // Inserts nodes in the order: DtypeConvert → Resize → BGRToRGB → HWCToCHW → Normalize.
-    // Only nodes whose transformation is actually needed are added.
-    static Pipeline BuildInputPipeline(const utils::TensorInfo& target_info);
+    // Builds a pipeline from a manifest pipeline node array.
+    // Each node is created via PipelineNodeFactory by name+params.
+    static Pipeline BuildFromManifest(
+        const std::vector<core::ManifestPipelineNode>& nodes);
 
     bool IsEmpty() const { return nodes_.empty(); }
 
@@ -193,23 +213,32 @@ class Pipeline {
 
 **内置节点规格：**
 
-| 节点类 | 输入 | 输出 | 参数 |
-|--------|------|------|------|
-| `DtypeConvertNode` | 任意 dtype | 目标 dtype | `target_dtype` |
-| `ResizeNode` | HWC uint8/float32 | 目标 H×W | `target_h, target_w`，双线性插值 |
-| `BGRToRGBNode` | 3 通道 | 3 通道（通道翻转）| 无 |
-| `HWCToCHWNode` | H×W×C | C×H×W | 无 |
-| `NormalizeNode` | float32 | float32 | `mean[C], std[C]` 逐通道归一化 |
+| 节点类 | 注册名 | 输入 | 输出 | 参数 |
+|--------|--------|------|------|------|
+| `DtypeConvertNode` | `atlas::dtype_convert` | 任意 dtype | 目标 dtype | `target_dtype` |
+| `ResizeNode` | `atlas::resize` | HWC uint8/float32 | 目标 H×W | `target_h, target_w`，双线性插值 |
+| `BGRToRGBNode` | `atlas::bgr_to_rgb` | 3 通道 | 3 通道（通道翻转）| 无 |
+| `HWCToCHWNode` | `atlas::hwc_to_chw` | H×W×C | C×H×W | 无 |
+| `NormalizeNode` | `atlas::normalize` | float32 | float32 | `mean[C], std[C]` 逐通道归一化 |
 
-**Pipeline 自动构建逻辑（`BuildInputPipeline`）：**
+**Pipeline 清单构建逻辑（`BuildFromManifest`）：**
 
+管线不再自动推断节点链。节点由用户在 manifest 的 `pipeline` 数组中显式声明，`BuildFromManifest` 遍历数组，通过 `PipelineNodeFactory::Create(name, params)` 按名称创建节点实例。
+
+```cpp
+// ModelManager::Init() 中
+for (const auto& input : model.inputs) {
+    if (!input.pipeline.empty()) {
+        entry.input_pipelines.push_back(
+            pipeline::Pipeline::BuildFromManifest(input.pipeline));
+    }
+    // pipeline 为空 → 无预处理（identity 直通）
+}
 ```
-TensorInfo.dtype != kUInt8  →  跳过 DtypeConvert
-TensorInfo.shape[H] / [W]   →  插入 ResizeNode（目标尺寸从 shape 读取）
-                （用户可通过 layout 判断 H/W 在 shape 中的位置）
-TensorInfo.layout == "NCHW" →  插入 HWCToCHWNode（原始图像默认 HWC）
-TensorInfo.has_normalize    →  插入 NormalizeNode
-```
+
+> **注意**：`Pipeline::BuildInputPipeline()` 自动构建方法已删除。用户必须通过 manifest 显式声明。
+>
+> 用户自定义节点可通过 `ATLAS_REGISTER_PIPELINE_NODE` 宏注册，manifest 中按 name 引用。
 
 ---
 
@@ -323,7 +352,7 @@ BackendFactory::Create("cpu")
 CpuBackend::Load(model_path, config)
       │
       ▼
-Pipeline::BuildInputPipeline(input_info)
+Pipeline::BuildFromManifest(input.pipeline)   ← 从 manifest 显式构建
       │   (uint8 HWC 224×224×3  →  float32 NCHW 1×3×224×224)
       ▼
 Pipeline::Run(raw_image, preprocessed_tensor)
@@ -364,7 +393,7 @@ CpuBackend::Infer(inputs, outputs)
 
 ---
 
-> **【补充】** Proposal-001 | 2026-06-26 | Manifest 自由配置 Pipeline，在清单文件中新增可选的 `pipeline` 字段，允许用户声明式定义预处理 / 后处理节点链；同时保留现有自动构建逻辑作为默认行为（向后兼容）。详细设计见 docs/proposals/001-pipeline-manifest-config.md。
+> **【补充】** Proposal-001 | 2026-06-26（2026-07-10 修订） | Manifest 自由配置 Pipeline，在清单文件中新增可选的 `pipeline` 字段，允许用户声明式定义预处理 / 后处理节点链；**删除 `BuildInputPipeline()` 自动构建和 `disable_pipeline` 字段**，增加分阶段 Profile 统计，开放 `ATLAS_REGISTER_PIPELINE_NODE` 用户自定义节点注册；`PipelineContext` 重构为 `IPipelineNode::Context`（嵌套类型，字段：`config`、`backend`、`input_index`、`output_index`、`flags`、`args`）。详细设计见 docs/proposals/001-pipeline-manifest-config.md。
 
 > **【补充】** Proposal-002 | 2026-06-26 | SNPE 后端接入，在阶段二建立的后端抽象层（IBackend / IBackendContext / BackendFactory）基础上新增 SnpeBackend + SnpeBackendContext，通过条件编译 + stub 降级方案实现跨平台兼容。详细设计见 docs/proposals/002-snpe-backend.md。
 

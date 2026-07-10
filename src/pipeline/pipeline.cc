@@ -31,7 +31,8 @@ void Pipeline::AddNode(std::unique_ptr<IPipelineNode> node) {
 }
 
 utils::ErrorCode Pipeline::Run(const utils::Tensor& input,
-                                utils::Tensor* output) const {
+                              utils::Tensor* output,
+                              const IPipelineNode::Context& ctx) const {
     if (output == nullptr) return utils::ErrorCode::kInvalidArgument;
     if (nodes_.empty()) {
         // Identity: point output at input without copying.
@@ -50,7 +51,7 @@ utils::ErrorCode Pipeline::Run(const utils::Tensor& input,
     utils::Tensor*       cur_out = &buf_a;
 
     for (size_t i = 0; i < nodes_.size(); ++i) {
-        auto ret = nodes_[i]->Process(*cur_in, cur_out);
+        auto ret = nodes_[i]->Process(ctx, *cur_in, cur_out);
         if (ret != utils::ErrorCode::kOk) return ret;
 
         // Swap buffers for the next iteration.

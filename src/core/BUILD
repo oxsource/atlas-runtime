@@ -1,7 +1,10 @@
 cc_library(
     name = "manifest_config",
     hdrs = ["manifest_config.h"],
-    deps = ["//src/utils:types"],
+    deps = [
+        "//src/profiler:profile_config",
+        "//src/utils:types",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -29,6 +32,7 @@ cc_library(
         "//src/backend/base:i_backend_context",
         "//src/backend/base:profiling_backend",
         "//src/pipeline:pipeline",
+        "//src/profiler:profiler",
         "//src/utils:logger",
         "//src/utils:types",
     ],

@@ -9,11 +9,14 @@
 #include "src/utils/strings.h"
 #include "src/utils/types.h"
 
+namespace {
+constexpr std::string_view kNodeName = "atlas::resize";
+}  // namespace
+
 namespace atlas {
 namespace pipeline {
 
 namespace {
-constexpr std::string_view kNodeName = "Resize";
 
 // Bilinear resize for float32 HWC tensors.
 void BilinearResizeFloat(const float* src, int src_h, int src_w,
@@ -98,8 +101,8 @@ ResizeNode::ResizeNode(int target_h, int target_w)
 
 std::string_view ResizeNode::Name() const { return kNodeName; }
 
-utils::ErrorCode ResizeNode::Process(const utils::Tensor& input,
-                                      utils::Tensor* output) {
+utils::ErrorCode ResizeNode::Process(const Context& ctx,
+                                    const utils::Tensor& input, utils::Tensor* output) {
     if (output == nullptr) return utils::ErrorCode::kInvalidArgument;
     if (input.info.shape.size() != 3) return utils::ErrorCode::kInvalidArgument;
 
@@ -161,4 +164,5 @@ std::unique_ptr<IPipelineNode> ResizeNode::CreateFromParams(
 }  // namespace pipeline
 }  // namespace atlas
 
-ATLAS_REGISTER_PIPELINE_NODE("resize", atlas::pipeline::ResizeNode)
+ATLAS_REGISTER_PIPELINE_NODE(kNodeName, atlas::pipeline::ResizeNode)
+

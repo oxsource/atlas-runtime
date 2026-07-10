@@ -30,9 +30,10 @@ class Pipeline {
 
     // Runs all nodes in order.  |input| is the raw source tensor;
     // |output| receives the final processed tensor.
+    // |ctx| is forwarded to every node's Process() call.
     // Returns kOk on success, or the error code from the first failing node.
     utils::ErrorCode Run(const utils::Tensor& input,
-                          utils::Tensor* output) const;
+                        utils::Tensor* output, const IPipelineNode::Context& ctx = {}) const;
 
     // Builds a default input pre-processing pipeline from |target_info|.
     //
@@ -63,3 +64,4 @@ class Pipeline {
 
 }  // namespace pipeline
 }  // namespace atlas
+

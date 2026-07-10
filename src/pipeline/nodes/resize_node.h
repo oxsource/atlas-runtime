@@ -17,8 +17,8 @@ class ResizeNode : public IPipelineNode {
  public:
     ResizeNode(int target_h, int target_w);
 
-    utils::ErrorCode Process(const utils::Tensor& input,
-                              utils::Tensor* output) override;
+    utils::ErrorCode Process(const Context& ctx,
+                            const utils::Tensor& input, utils::Tensor* output) override;
     std::string_view Name() const override;
 
     // Creates a node from manifest params.
@@ -34,3 +34,4 @@ class ResizeNode : public IPipelineNode {
 
 }  // namespace pipeline
 }  // namespace atlas
+

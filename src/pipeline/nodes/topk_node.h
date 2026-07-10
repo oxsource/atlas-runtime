@@ -21,8 +21,8 @@ class TopKNode : public IPipelineNode {
  public:
     explicit TopKNode(int k);
 
-    utils::ErrorCode Process(const utils::Tensor& input,
-                              utils::Tensor* output) override;
+    utils::ErrorCode Process(const Context& ctx,
+                            const utils::Tensor& input, utils::Tensor* output) override;
     std::string_view Name() const override;
 
     // Creates a node from manifest params.
@@ -36,3 +36,4 @@ class TopKNode : public IPipelineNode {
 
 }  // namespace pipeline
 }  // namespace atlas
+

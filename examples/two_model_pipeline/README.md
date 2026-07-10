@@ -58,6 +58,6 @@ Runtime released. Done.
 |---|---|
 | `AtlasRuntime::Init()` | Parses manifest, creates shared `CpuBackendContext` |
 | `AtlasRuntime::GetModel()` | Obtains `ModelHandle` (lazy load on first call) |
-| `Pipeline::BuildInputPipeline()` | Auto-built from manifest: DtypeConvert → Resize → BGRToRGB → HWCToCHW → Normalize |
+| `Pipeline::BuildFromManifest()` | Built from manifest pipeline array: DtypeConvert → Resize → BGRToRGB → HWCToCHW → Normalize |
 | `ModelHandle::Run()` | One call covers full preprocessing + inference |
 | `ErrorCode` | All return values checked; no exceptions |

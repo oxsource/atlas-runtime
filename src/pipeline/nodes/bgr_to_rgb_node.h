@@ -16,8 +16,8 @@ class BGRToRGBNode : public IPipelineNode {
  public:
     BGRToRGBNode() = default;
 
-    utils::ErrorCode Process(const utils::Tensor& input,
-                              utils::Tensor* output) override;
+    utils::ErrorCode Process(const Context& ctx,
+                            const utils::Tensor& input, utils::Tensor* output) override;
     std::string_view Name() const override;
     bool SupportsInPlace() const override { return true; }
 
@@ -28,3 +28,4 @@ class BGRToRGBNode : public IPipelineNode {
 
 }  // namespace pipeline
 }  // namespace atlas
+

@@ -46,7 +46,7 @@ AtlasRuntime                        ← 对外公开，应用层直接使用
             │
             ├── ManifestParser      ← 已有（阶段一）
             ├── BackendFactory      ← 已有（阶段一，扩展 context 注册）
-            ├── Pipeline            ← 已有（阶段二）
+            ├── Pipeline            ← 已有（阶段二，由 manifest pipeline 数组显式构建）
             │
             ├── IBackendContext["cpu"]   ← 新增，整个运行时唯一一份
             │       └── Ort::Env
@@ -101,7 +101,7 @@ ModelHandle                         ← GetModel() 返回，非拥有指针
 |------|--------|-------------|
 | `IBackendContext` | `ModelManager` | 与 `ModelManager` 同生死 |
 | `IBackend`（每模型） | `ModelManager::ModelEntry` | 借用 context，context 必须先于 backend 销毁 |
-| `Pipeline`（每模型）| `ModelManager::ModelEntry` | 独立 |
+| `Pipeline`（每 input/output）| `ModelManager::ModelEntry` | 独立，从 manifest pipeline 数组显式构建 |
 | `ModelHandle` | 调用方（栈或成员）| **不拥有**，生命周期必须短于 `AtlasRuntime` |
 
 **接口层级：**
@@ -225,11 +225,13 @@ namespace core {
 enum class LoadStrategy { kEager = 0, kLazy };
 
 struct ModelEntry {
-    ModelConfig                        config;
-    std::unique_ptr<backend::IBackend> backend;
-    pipeline::Pipeline                 pipeline;
-    LoadStrategy                       strategy = LoadStrategy::kEager;
-    bool                               loaded   = false;
+    ModelConfig                            config;
+    std::unique_ptr<backend::IBackend>     backend;
+    std::vector<pipeline::Pipeline>        input_pipelines;   // one per input
+    std::vector<pipeline::Pipeline>        output_pipelines;  // one per output
+    core::ProfileConfig                    profile;           // profiling config
+    LoadStrategy                           strategy = LoadStrategy::kEager;
+    bool                                   loaded   = false;
 };
 
 class ModelManager {
@@ -267,7 +269,7 @@ class ModelManager {
 2. 为每种类型调用 BackendFactory::CreateContext()，存入 contexts_；
 3. 遍历 manifest.models：
    a. 通过 BackendFactory::Create() 创建 IBackend 实例；
-   b. 根据 TensorInfo 调用 Pipeline::BuildInputPipeline()；
+   b. 根据 manifest pipeline 数组调用 Pipeline::BuildFromManifest()（数组为空时不构建）；
    c. 若 strategy == kEager，立即调用 backend->Load(path, cfg, ctx)；
 4. 返回 kOk（若任意 eager 模型加载失败，返回错误并 ReleaseAll()）。
 ```
@@ -288,7 +290,11 @@ class ModelHandle {
     bool IsValid() const;
 
     // Full inference chain: Pipeline preprocessing → IBackend::Infer().
+    // Profile phases internally: input_pipeline / forward / output_pipeline.
     utils::ErrorCode Run(const utils::Tensor& raw_input,
+                          std::vector<utils::Tensor>* outputs);
+
+    utils::ErrorCode Run(const std::vector<utils::Tensor>& inputs,
                           std::vector<utils::Tensor>* outputs);
 
     std::vector<utils::TensorInfo> GetInputInfo()  const;

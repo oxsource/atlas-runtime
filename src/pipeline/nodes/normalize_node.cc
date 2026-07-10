@@ -8,12 +8,15 @@
 #include "src/pipeline/pipeline_node_factory.h"
 #include "src/utils/types.h"
 
+namespace {
+constexpr std::string_view kNodeName = "atlas::normalize";
+}  // namespace
+
 namespace atlas {
 namespace pipeline {
 
 namespace {
-constexpr std::string_view kNodeName     = "Normalize";
-constexpr float            kInvScale255 = 1.0f / 255.0f;
+constexpr float kInvScale255 = 1.0f / 255.0f;
 }  // namespace
 
 NormalizeNode::NormalizeNode(const std::vector<float>& mean,
@@ -22,8 +25,8 @@ NormalizeNode::NormalizeNode(const std::vector<float>& mean,
 
 std::string_view NormalizeNode::Name() const { return kNodeName; }
 
-utils::ErrorCode NormalizeNode::Process(const utils::Tensor& input,
-                                         utils::Tensor* output) {
+utils::ErrorCode NormalizeNode::Process(const Context& ctx,
+                                       const utils::Tensor& input, utils::Tensor* output) {
     if (output == nullptr) return utils::ErrorCode::kInvalidArgument;
     if (input.info.dtype != utils::DataType::kFloat32) {
         return utils::ErrorCode::kInvalidArgument;
@@ -111,4 +114,5 @@ std::unique_ptr<IPipelineNode> NormalizeNode::CreateFromParams(
 }  // namespace pipeline
 }  // namespace atlas
 
-ATLAS_REGISTER_PIPELINE_NODE("normalize", atlas::pipeline::NormalizeNode)
+ATLAS_REGISTER_PIPELINE_NODE(kNodeName, atlas::pipeline::NormalizeNode)
+
