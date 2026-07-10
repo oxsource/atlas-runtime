@@ -67,6 +67,21 @@ class IBackend {
 
     // ── Zero-copy buffers ────────────────────────────────────────────────
 
+    // Provides an external memory buffer for the i-th input tensor.
+    // When set, the backend will use |external_mem| as the source of input
+    // data instead of copying from the Tensor passed to Infer().
+    // The caller must ensure |external_mem| remains valid until the next
+    // Infer() call completes.
+    // Returns kInvalidArgument if this backend does not support it.
+    // Passing nullptr resets to internal buffer.
+    virtual utils::ErrorCode SetInputBuffer(size_t index, void* external_mem,
+                                             size_t byte_size) {
+        (void)index;
+        (void)external_mem;
+        (void)byte_size;
+        return utils::ErrorCode::kInvalidArgument;
+    }
+
     // Returns a writable buffer for the i-th input tensor.
     // After Load(), callers may write input data directly into this buffer
     // and then call Infer() with the same data pointer for zero-copy input.

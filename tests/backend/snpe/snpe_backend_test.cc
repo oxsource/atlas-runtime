@@ -116,6 +116,86 @@ TEST_F(SnpeBackendTest, ContextBackendTypeIsSnpe) {
     EXPECT_EQ(ctx.BackendType(), "snpe");
 }
 
+// ===========================================================================
+// SnpeBackendContext + SnpeMemoryPool integration tests
+//
+// These tests verify that the shared memory pool inside SnpeBackendContext
+// works correctly.  SnpeMemoryPool is pure C++ with no SNPE SDK dependency,
+// so these compile and pass on any platform including macOS / CI.
+// ===========================================================================
+
+TEST_F(SnpeBackendTest, ContextGetMemoryPool) {
+    SnpeBackendContext ctx;
+    auto& pool = ctx.GetMemoryPool();
+
+    // Pool reference is valid — Acquire/Release round-trip works.
+    auto buf = pool.Acquire(64);
+    EXPECT_NE(buf.data, nullptr);
+    EXPECT_GE(buf.size, 64u);
+
+    pool.Release(std::move(buf));
+    SUCCEED();
+}
+
+TEST_F(SnpeBackendTest, ContextPoolSharedAcquire) {
+    SnpeBackendContext ctx;
+    auto& pool = ctx.GetMemoryPool();
+
+    void* p1 = pool.AcquireShared("integ_key", 256);
+    ASSERT_NE(p1, nullptr);
+
+    void* p2 = pool.AcquireShared("integ_key", 256);
+    EXPECT_EQ(p2, p1);  // Same pointer (refcount=2).
+
+    pool.ReleaseShared("integ_key");  // refcount=1
+    pool.ReleaseShared("integ_key");  // refcount=0 → recycled
+}
+
+TEST_F(SnpeBackendTest, ContextPoolClearAndReuse) {
+    SnpeBackendContext ctx;
+    auto& pool = ctx.GetMemoryPool();
+
+    pool.AcquireShared("c", 512);
+    EXPECT_GT(pool.TotalAllocatedBytes(), 0u);
+
+    pool.Clear();
+    EXPECT_EQ(pool.TotalAllocatedBytes(), 0u);
+
+    // After Clear, pool is usable again.
+    auto buf = pool.Acquire(256);
+    EXPECT_NE(buf.data, nullptr);
+}
+
+TEST_F(SnpeBackendTest, ContextPoolDoubleFreeProtection) {
+    SnpeBackendContext ctx;
+    auto& pool = ctx.GetMemoryPool();
+
+    // ReleaseShared on non-existent key is a no-op (must not crash).
+    pool.ReleaseShared("nonexistent");
+
+    pool.AcquireShared("d", 128);
+    pool.ReleaseShared("d");
+    // Repeated release is safe (already moved to free list).
+    pool.ReleaseShared("d");
+    SUCCEED();
+}
+
+TEST_F(SnpeBackendTest, ContextPoolWithoutSharedNoOp) {
+    SnpeBackendContext ctx;
+    auto& pool = ctx.GetMemoryPool();
+
+    // Load/Unload cycle without any shared_input config.
+    // In stub mode, Load returns kBackendNotFound — pool stays untouched.
+    auto cfg = MakeModelConfig();
+    (void)backend_.Load(cfg.model_path, cfg, &ctx);
+
+    // Regardless of Load result, the pool should be clean.
+    EXPECT_EQ(pool.TotalAllocatedBytes(), 0u);
+
+    backend_.Unload();
+    EXPECT_EQ(pool.TotalAllocatedBytes(), 0u);
+}
+
 }  // namespace
 }  // namespace backend
 }  // namespace atlas

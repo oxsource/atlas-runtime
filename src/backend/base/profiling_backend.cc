@@ -125,6 +125,12 @@ utils::Span<void> ProfilingBackend::GetOutputBuffer(size_t index) const {
     return inner_->GetOutputBuffer(index);
 }
 
+utils::ErrorCode ProfilingBackend::SetInputBuffer(size_t index,
+                                                   void* external_mem,
+                                                   size_t byte_size) {
+    return inner_->SetInputBuffer(index, external_mem, byte_size);
+}
+
 bool ProfilingBackend::IsLoaded() const { return inner_->IsLoaded(); }
 
 std::string ProfilingBackend::Version() const { return inner_->Version(); }

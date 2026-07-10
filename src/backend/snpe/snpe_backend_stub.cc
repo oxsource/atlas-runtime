@@ -72,6 +72,30 @@ utils::Span<void> SnpeBackend::GetOutputBuffer(size_t index) const {
     return {};
 }
 
+utils::ErrorCode SnpeBackend::SetInputBuffer(size_t index, void* external_mem,
+                                              size_t byte_size) {
+    (void)index;
+    (void)external_mem;
+    (void)byte_size;
+    return utils::ErrorCode::kNotInitialized;
+}
+
+utils::ErrorCode SnpeBackend::InferWithTensor(
+    const std::vector<utils::Tensor>& inputs,
+    std::vector<utils::Tensor>& outputs) {
+    (void)inputs;
+    (void)outputs;
+    return utils::ErrorCode::kNotInitialized;
+}
+
+utils::ErrorCode SnpeBackend::InferWithBuffer(
+    const std::vector<utils::Tensor>& inputs,
+    std::vector<utils::Tensor>& outputs) {
+    (void)inputs;
+    (void)outputs;
+    return utils::ErrorCode::kNotInitialized;
+}
+
 std::string SnpeBackend::Version() const {
     return "stub";
 }

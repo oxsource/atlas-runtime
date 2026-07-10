@@ -59,6 +59,23 @@ class ModelHandle {
     // Returns an empty Tensor if the backend does not support this.
     utils::Tensor GetOutputTensor(size_t index) const;
 
+    // Injects an external memory buffer as the input source for the given
+    // input index (Level 3 external memory injection).
+    //
+    // After a successful call, subsequent Run() calls will read input data
+    // from |external_mem| instead of copying from the Tensor passed to
+    // Run().  The caller must ensure |external_mem| remains valid and
+    // contains the correct input data before each Run().
+    //
+    // Passing nullptr for |external_mem| resets to the backend's internal
+    // buffer.
+    //
+    // @return kOk on success; kInvalidArgument if the backend does not
+    //         support external memory injection; kNotInitialized if the
+    //         handle is invalid.
+    utils::ErrorCode SetInputBuffer(size_t index, void* external_mem,
+                                     size_t byte_size) const;
+
     std::string GetBackend() const;
     std::string GetModelPath() const;
     int GetLoadStrategy() const;

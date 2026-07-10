@@ -36,6 +36,8 @@ class SnpeBackend : public IBackend {
 
     utils::Span<void> GetInputBuffer(size_t index) const override;
     utils::Span<void> GetOutputBuffer(size_t index) const override;
+    utils::ErrorCode SetInputBuffer(size_t index, void* external_mem,
+                                     size_t byte_size) override;
 
     std::vector<utils::TensorInfo> GetInputInfo()  const override;
     std::vector<utils::TensorInfo> GetOutputInfo() const override;
@@ -45,10 +47,28 @@ class SnpeBackend : public IBackend {
     std::string Version() const override;
 
  private:
+    // Quantization parameters extracted from SNPE IBufferAttributes
+    // at Load() time, used by the UserBuffer path.
+    struct QuantParams {
+        float    scale      = 1.0f;   // quantized_step_size
+        int32_t  zero_point = 0;      // step_exactly_0
+        uint32_t bandwidth  = 8;      // bits (TF8=8, TF16=16)
+    };
+
     // Reads input/output metadata from the loaded SNPE network into
-    // input_info_ / output_info_ and populates impl_->input_names /
-    // impl_->output_names.
+    // input_info_ / output_info_ / input_quant_params_ / output_quant_params_
+    // and populates impl_->input_names / impl_->output_names.
+    // This is the single source of truth for all tensor metadata used by
+    // both ITensor and UserBuffer paths.
     utils::ErrorCode BuildTensorInfos();
+
+    // ITensor-based inference path (use_buffer == false).
+    utils::ErrorCode InferWithTensor(const std::vector<utils::Tensor>& inputs,
+                                      std::vector<utils::Tensor>& outputs);
+
+    // UserBuffer-based inference path (use_buffer == true).
+    utils::ErrorCode InferWithBuffer(const std::vector<utils::Tensor>& inputs,
+                                      std::vector<utils::Tensor>& outputs);
 
     // Stored model config (used for builder.setOutputTensors()).
     core::ModelConfig model_config_;
@@ -58,6 +78,12 @@ class SnpeBackend : public IBackend {
 
     std::vector<utils::TensorInfo> input_info_;
     std::vector<utils::TensorInfo> output_info_;
+
+    // Quantization params extracted in BuildTensorInfos() alongside
+    // input_info_ / output_info_.  Used exclusively by the UserBuffer
+    // path (CreateEncoding); ITensor path ignores them.
+    std::vector<QuantParams> input_quant_params_;
+    std::vector<QuantParams> output_quant_params_;
 
     bool loaded_ = false;
 

@@ -153,6 +153,13 @@ utils::Tensor ModelHandle::GetOutputTensor(size_t index) const {
     return t;
 }
 
+utils::ErrorCode ModelHandle::SetInputBuffer(size_t index,
+                                              void* external_mem,
+                                              size_t byte_size) const {
+    if (!IsValid()) return utils::ErrorCode::kNotInitialized;
+    return entry_->backend->SetInputBuffer(index, external_mem, byte_size);
+}
+
 std::string ModelHandle::GetBackend() const {
     if (!IsValid()) return {};
     return entry_->config.backend;

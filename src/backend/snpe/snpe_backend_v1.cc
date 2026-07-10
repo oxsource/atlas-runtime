@@ -1,6 +1,7 @@
 #include "src/backend/snpe/snpe_backend.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -22,7 +23,9 @@
 #include "SNPE/SNPEFactory.hpp"
 
 #include "src/backend/base/backend_factory.h"
+#include "src/backend/snpe/snpe_aligned_buffer.h"
 #include "src/backend/snpe/snpe_backend_context.h"
+#include "src/backend/snpe/snpe_memory_pool.h"
 #include "src/utils/types.h"
 
 #define LOG_TAG "Atlas::SnpeBE_V1"
@@ -37,11 +40,36 @@ struct SnpeBackend::SnpeImpl {
     std::unique_ptr<zdl::SNPE::SNPE>                snpe;
     std::vector<std::string>                        input_names;
     std::vector<std::string>                        output_names;
+
+    // ── ITensor path fields (use_buffer == false) ──
     // Pre-allocated input ITensors (created once in Load(), reused in Infer()).
     std::vector<std::unique_ptr<zdl::DlSystem::ITensor>> input_tensors;
     // Output TensorMap lives here (zero-copy: returned pointers stay valid
     // until the next Infer() call overwrites them).
     zdl::DlSystem::TensorMap                             output_map;
+
+    // ── UserBuffer path fields (use_buffer == true) ──
+    bool use_buffer = false;
+    std::vector<std::unique_ptr<zdl::DlSystem::IUserBuffer>> user_input_buffers;
+    std::vector<std::unique_ptr<zdl::DlSystem::IUserBuffer>> user_output_buffers;
+    std::vector<std::unique_ptr<zdl::DlSystem::UserBufferEncoding>>
+        user_input_encodings;
+    std::vector<std::unique_ptr<zdl::DlSystem::UserBufferEncoding>>
+        user_output_encodings;
+    // Internally owned aligned buffers backing the UserBuffers.
+    std::vector<AlignedBuffer> user_input_raw;
+    std::vector<AlignedBuffer> user_output_raw;
+    // External memory pointers set via SetInputBuffer() (may be null).
+    std::vector<void*> user_input_external;
+    // Stride array for each UserBuffer.
+    std::vector<size_t> input_buffer_stride;
+    std::vector<size_t> output_buffer_stride;
+
+    // ── Shared buffer support (use_buffer == true, optional) ──
+    // When non-empty, input backing memory is owned by SnpeMemoryPool
+    // in the shared context.  user_input_raw[i] holds a non-owning
+    // reference (data pointer borrowed from the pool).
+    std::string shared_input_key;
 };
 
 namespace {
@@ -50,6 +78,7 @@ namespace {
 constexpr char kConfigRuntime[]    = "runtime";
 constexpr char kConfigPerfProfile[] = "performance_profile";
 constexpr char kConfigUseBuffer[]  = "use_buffer";
+constexpr char kConfigSharedInput[] = "shared_input";
 
 // Runtime name strings accepted from manifest config.
 constexpr char kRuntimeCpu[] = "cpu";
@@ -181,6 +210,99 @@ int ParsePerformanceProfile(const std::string& profile_str) {
     }
     return static_cast<int>(
         zdl::DlSystem::PerformanceProfile_t::BALANCED);
+}
+
+// Aligned memory alignment constant for DSP/HTP buffers.
+constexpr size_t kBufferAlignment = 128;
+
+// Computes per-dimension byte strides for a UserBuffer.
+// Stride[d] = element_size * prod(shape[d+1], ..., shape[rank-1]).
+// This formula works for any layout because the stride array order matches
+// the shape array order.
+std::vector<size_t> ComputeUserBufferStride(const std::vector<int>& shape,
+                                             size_t element_size) {
+    const size_t rank = shape.size();
+    if (rank == 0) return {};
+    std::vector<size_t> stride(rank, element_size);
+    for (size_t i = rank; i > 1; --i) {
+        stride[i - 2] = stride[i - 1] *
+            static_cast<size_t>(std::max(shape[i - 1], 1));
+    }
+    return stride;
+}
+
+// Adapts uint8_t input data to int8_t (TF8) by subtracting 128.
+// This is a simple range shift: [0, 255] -> [-128, 127].
+void AdaptU8ToTf8(const void* src, void* dst, size_t count) {
+    const auto* u8_src = static_cast<const uint8_t*>(src);
+    auto* s8_dst = static_cast<int8_t*>(dst);
+    for (size_t i = 0; i < count; ++i) {
+        s8_dst[i] = static_cast<int8_t>(static_cast<int>(u8_src[i]) - 128);
+    }
+}
+
+// Returns true if the input at |index| needs U8->TF8 conversion.
+bool NeedsQuantizationAdaptation(
+    const std::vector<utils::TensorInfo>& info,
+    size_t index, utils::DataType input_dtype) {
+    return (info[index].dtype == utils::DataType::kInt8 &&
+            input_dtype == utils::DataType::kUInt8);
+}
+
+// Creates the appropriate UserBufferEncoding subclass for the given
+// dtype and quantization parameters.  Returns nullptr on error.
+// Manifest-overridden dtype takes effect here (via info.dtype from
+// input_info_ / output_info_, which already includes manifest overrides).
+std::unique_ptr<zdl::DlSystem::UserBufferEncoding> CreateEncoding(
+    utils::DataType dtype,
+    float scale,
+    int32_t zero_point,
+    uint32_t bandwidth) {
+    switch (dtype) {
+        case utils::DataType::kFloat32:
+            return std::make_unique<zdl::DlSystem::UserBufferEncodingFloat>();
+        case utils::DataType::kInt8:
+            return std::make_unique<zdl::DlSystem::UserBufferEncodingTfN>(
+                zero_point, scale, bandwidth);
+        case utils::DataType::kUInt8:
+            // 1.x does not have UserBufferEncodingUint8;
+            // UINT8 is represented as TfN with identity params.
+            return std::make_unique<zdl::DlSystem::UserBufferEncodingTfN>(
+                0, 1.0f, 8);
+        default:
+            return nullptr;
+    }
+}
+
+// Extracts quantization parameters (scale, zero_point, bandwidth) from
+// SNPE IBufferAttributes encoding.  Returns default QuantParams when the
+// encoding is not a quantized type (TF8/TF16).
+SnpeBackend::QuantParams ExtractQuantParamsFromAttrs(
+    zdl::DlSystem::IBufferAttributes* attrs) {
+    SnpeBackend::QuantParams qp;
+    auto encoding_type = attrs->getEncodingType();
+    if (encoding_type ==
+            zdl::DlSystem::UserBufferEncoding::ElementType_t::TF8 ||
+        encoding_type ==
+            zdl::DlSystem::UserBufferEncoding::ElementType_t::TF16) {
+        auto* tfN = static_cast<zdl::DlSystem::UserBufferEncodingTfN*>(
+            attrs->getEncoding());
+        qp.scale      = tfN->getQuantizedStepSize();
+        qp.zero_point = tfN->getStepExactly0();
+        qp.bandwidth  = tfN->getBandWidth();
+    }
+    return qp;
+}
+
+// Returns default quantization parameters for the given data type.
+// This is used when manifest overrides the runtime dtype, resetting
+// quantization params to sensible defaults for the new dtype.
+SnpeBackend::QuantParams QuantParamsForDtype(utils::DataType dtype) {
+    SnpeBackend::QuantParams qp;
+    if (dtype == utils::DataType::kInt8) {
+        qp = {1.0f, 0, 8};
+    }
+    return qp;
 }
 
 }  // namespace
@@ -320,8 +442,11 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
         return ret;
     }
 
-    // 7. Pre-allocate input ITensors (fixed shape, reused across Infer calls).
-    {
+    impl_->use_buffer = (use_buffer != 0);
+
+    // 7. Pre-allocate inference resources based on the selected path.
+    if (!impl_->use_buffer) {
+        // ── ITensor path: pre-allocate input ITensors (reused across Infer). ──
         auto& tensor_factory = zdl::SNPE::SNPEFactory::getTensorFactory();
         impl_->input_tensors.clear();
         impl_->input_tensors.reserve(input_info_.size());
@@ -340,6 +465,161 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
                 return utils::ErrorCode::kInferFailed;
             }
             impl_->input_tensors.push_back(std::move(itensor));
+        }
+    } else {
+        // ── UserBuffer path: create input and output UserBuffers. ──
+        impl_->user_input_buffers.clear();
+        impl_->user_output_buffers.clear();
+        impl_->user_input_encodings.clear();
+        impl_->user_output_encodings.clear();
+        impl_->user_input_raw.clear();
+        impl_->user_output_raw.clear();
+        impl_->user_input_external.clear();
+        impl_->input_buffer_stride.clear();
+        impl_->output_buffer_stride.clear();
+
+        // ── Read shared_input config (optional) ──
+        impl_->shared_input_key.clear();
+        {
+            auto it = config.config.find(kConfigSharedInput);
+            if (it != config.config.end() && !it->second.empty()) {
+                impl_->shared_input_key = it->second;
+                ATLAS_LOGD("Using shared input buffer key='%s'",
+                           impl_->shared_input_key.c_str());
+            }
+        }
+
+        // Get pool reference when shared key is set and context is available.
+        SnpeMemoryPool* pool = nullptr;
+        if (!impl_->shared_input_key.empty() && active_ctx_ != nullptr) {
+            pool = &active_ctx_->GetMemoryPool();
+        }
+
+        impl_->user_input_buffers.reserve(input_info_.size());
+        impl_->user_input_encodings.reserve(input_info_.size());
+        impl_->user_input_raw.reserve(input_info_.size());
+        impl_->user_input_external.reserve(input_info_.size());
+        impl_->input_buffer_stride.reserve(input_info_.size());
+
+        for (size_t i = 0; i < input_info_.size(); ++i) {
+            const std::string& name = impl_->input_names[i];
+            const utils::TensorInfo& info = input_info_[i];
+            const QuantParams& qp = input_quant_params_[i];
+
+            // Use pre-computed info + quant params from BuildTensorInfos(),
+            // no redundant getInputOutputBufferAttributes() call.
+            auto encoding = CreateEncoding(info.dtype, qp.scale,
+                                           qp.zero_point, qp.bandwidth);
+            if (encoding == nullptr) {
+                ATLAS_LOGE("Unsupported input[%zu] dtype %d for UserBuffer",
+                           i, static_cast<int>(info.dtype));
+                Unload();
+                return utils::ErrorCode::kInferFailed;
+            }
+
+            const size_t element_size = ElementByteSize(info.dtype);
+            std::vector<size_t> stride = ComputeUserBufferStride(
+                info.shape, element_size);
+            const size_t buffer_size = stride.empty() ? 0 : stride[0] *
+                static_cast<size_t>(std::max(info.shape[0], 1));
+
+            // ── Allocate input buffer: from pool (shared) or local ──
+            AlignedBuffer raw;
+            if (pool != nullptr) {
+                // Acquire from pool: raw gets a non-owning AlignedBuffer.
+                // The pool owns the memory — we nullify data in Unload().
+                void* shared_mem = pool->AcquireShared(
+                    impl_->shared_input_key, buffer_size, kBufferAlignment);
+                if (shared_mem == nullptr && buffer_size > 0) {
+                    ATLAS_LOGE("Failed to acquire shared buffer[%zu] (%zu bytes)",
+                               i, buffer_size);
+                    Unload();
+                    return utils::ErrorCode::kInferFailed;
+                }
+                raw.data = shared_mem;
+                raw.size = buffer_size;
+            } else {
+                raw = AlignedBuffer(buffer_size, kBufferAlignment);
+                if (buffer_size > 0 && raw.data == nullptr) {
+                    ATLAS_LOGE("Failed to allocate input buffer[%zu] (%zu bytes)",
+                               i, buffer_size);
+                    Unload();
+                    return utils::ErrorCode::kInferFailed;
+                }
+            }
+
+            auto user_buf = impl_->snpe->createInputBuffer(
+                name.c_str(),
+                static_cast<size_t>(raw.size),
+                stride.data(),
+                encoding.get());
+            if (user_buf == nullptr) {
+                ATLAS_LOGE("Failed to create input UserBuffer[%zu]: %s",
+                           i, name.c_str());
+                Unload();
+                return utils::ErrorCode::kInferFailed;
+            }
+
+            impl_->user_input_encodings.push_back(std::move(encoding));
+            impl_->user_input_raw.push_back(std::move(raw));
+            impl_->user_input_buffers.push_back(std::move(user_buf));
+            impl_->user_input_external.push_back(nullptr);
+            impl_->input_buffer_stride.push_back(
+                stride.empty() ? 0 : stride[0]);
+        }
+
+        // Create output UserBuffers.
+        impl_->user_output_buffers.reserve(output_info_.size());
+        impl_->user_output_encodings.reserve(output_info_.size());
+        impl_->user_output_raw.reserve(output_info_.size());
+        impl_->output_buffer_stride.reserve(output_info_.size());
+
+        for (size_t i = 0; i < output_info_.size(); ++i) {
+            const std::string& name = impl_->output_names[i];
+            const utils::TensorInfo& info = output_info_[i];
+            const QuantParams& qp = output_quant_params_[i];
+
+            // Use pre-computed info + quant params from BuildTensorInfos().
+            auto encoding = CreateEncoding(info.dtype, qp.scale,
+                                           qp.zero_point, qp.bandwidth);
+            if (encoding == nullptr) {
+                ATLAS_LOGE("Unsupported input[%zu] dtype %d for UserBuffer",
+                           i, static_cast<int>(info.dtype));
+                Unload();
+                return utils::ErrorCode::kInferFailed;
+            }
+
+            const size_t element_size = ElementByteSize(info.dtype);
+            std::vector<size_t> stride = ComputeUserBufferStride(
+                info.shape, element_size);
+            const size_t buffer_size = stride.empty() ? 0 : stride[0] *
+                static_cast<size_t>(std::max(info.shape[0], 1));
+
+            AlignedBuffer raw(buffer_size, kBufferAlignment);
+            if (buffer_size > 0 && raw.data == nullptr) {
+                ATLAS_LOGE("Failed to allocate output buffer[%zu] (%zu bytes)",
+                           i, buffer_size);
+                Unload();
+                return utils::ErrorCode::kInferFailed;
+            }
+
+            auto user_buf = impl_->snpe->createOutputBuffer(
+                name.c_str(),
+                static_cast<size_t>(raw.size),
+                stride.data(),
+                encoding.get());
+            if (user_buf == nullptr) {
+                ATLAS_LOGE("Failed to create output UserBuffer[%zu]: %s",
+                           i, name.c_str());
+                Unload();
+                return utils::ErrorCode::kInferFailed;
+            }
+
+            impl_->user_output_encodings.push_back(std::move(encoding));
+            impl_->user_output_raw.push_back(std::move(raw));
+            impl_->user_output_buffers.push_back(std::move(user_buf));
+            impl_->output_buffer_stride.push_back(
+                stride.empty() ? 0 : stride[0]);
         }
     }
 
@@ -360,11 +640,22 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
         return utils::ErrorCode::kInvalidArgument;
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Step 1: Copy input data into pre-allocated ITensors (unless
-    //         the caller already wrote directly into the ITensor
-    //         via GetInputBuffer() — skip in that case).
-    // ──────────────────────────────────────────────────────────────
+    if (!impl_->use_buffer) {
+        return InferWithTensor(inputs, outputs);
+    }
+    return InferWithBuffer(inputs, outputs);
+}
+
+// ── ITensor inference path (use_buffer == false) ──────────────────────────
+
+utils::ErrorCode SnpeBackend::InferWithTensor(
+    const std::vector<utils::Tensor>& inputs,
+    std::vector<utils::Tensor>& outputs) {
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 1: Copy input data into pre-allocated ITensors (unless the caller
+    //         already wrote directly via GetInputBuffer() — skip in that
+    //         case).
+    // ──────────────────────────────────────────────────────────────────────
     zdl::DlSystem::TensorMap input_map;
     for (size_t i = 0; i < inputs.size(); ++i) {
         const utils::Tensor& t = inputs[i];
@@ -399,9 +690,9 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
         }
     }
 
-    // ──────────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────────────────
     // Step 2: Execute (output goes into impl_->output_map for zero-copy).
-    // ──────────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────────────────
     if (output_info_.size() != impl_->output_names.size()) {
         ATLAS_LOGE("Output metadata mismatch: expected %zu infos, got %zu names",
                    output_info_.size(), impl_->output_names.size());
@@ -417,10 +708,10 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
         return utils::ErrorCode::kInferFailed;
     }
 
-    // ──────────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────────────────
     // Step 3: Wrap output tensors (zero-copy, pointers into output_map).
     // Caller must consume outputs before the next Infer() call.
-    // ──────────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────────────────
     outputs.clear();
     outputs.reserve(impl_->output_names.size());
     for (size_t i = 0; i < impl_->output_names.size(); ++i) {
@@ -445,6 +736,83 @@ utils::ErrorCode SnpeBackend::Infer(const std::vector<utils::Tensor>& inputs,
     return utils::ErrorCode::kOk;
 }
 
+// ── UserBuffer inference path (use_buffer == true) ─────────────────────────
+
+utils::ErrorCode SnpeBackend::InferWithBuffer(
+    const std::vector<utils::Tensor>& inputs,
+    std::vector<utils::Tensor>& outputs) {
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 1: Fill input buffers.
+    // ──────────────────────────────────────────────────────────────────────
+    for (size_t i = 0; i < inputs.size(); ++i) {
+        const utils::Tensor& t = inputs[i];
+        uint8_t* target = impl_->user_input_raw[i].AsU8();
+        const size_t target_size = impl_->user_input_raw[i].size;
+
+        if (target == nullptr || target_size == 0) {
+            ATLAS_LOGE("UserBuffer input[%zu] has null or empty buffer", i);
+            return utils::ErrorCode::kInferFailed;
+        }
+
+        // External memory injection via SetInputBuffer() — copy from
+        // external buffer to internal UserBuffer-backed buffer.
+        if (impl_->user_input_external[i] != nullptr &&
+            t.data == impl_->user_input_external[i]) {
+            std::memcpy(target, t.data, std::min(t.byte_size, target_size));
+            continue;
+        }
+
+        // Zero-copy: caller wrote directly into internal buffer.
+        if (t.data == static_cast<void*>(target)) {
+            continue;
+        }
+
+        // Quantization adaptation: U8 → TF8.
+        if (NeedsQuantizationAdaptation(input_info_, i, t.info.dtype)) {
+            const size_t count = std::min(t.byte_size, target_size);
+            AdaptU8ToTf8(t.data, target, count);
+            continue;
+        }
+
+        // Default: direct memcpy (dtype matches).
+        std::memcpy(target, t.data, std::min(t.byte_size, target_size));
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 2: Build UserBufferMap and execute.
+    // ──────────────────────────────────────────────────────────────────────
+    zdl::DlSystem::UserBufferMap input_map, output_map;
+    for (size_t i = 0; i < impl_->input_names.size(); ++i) {
+        input_map.add(impl_->input_names[i].c_str(),
+                      impl_->user_input_buffers[i].get());
+    }
+    for (size_t i = 0; i < impl_->output_names.size(); ++i) {
+        output_map.add(impl_->output_names[i].c_str(),
+                       impl_->user_output_buffers[i].get());
+    }
+
+    if (!impl_->snpe->execute(input_map, output_map)) {
+        ATLAS_LOGE("SNPE UserBuffer execute failed");
+        return utils::ErrorCode::kInferFailed;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 3: Wrap output buffers as zero-copy Tensors.
+    // ──────────────────────────────────────────────────────────────────────
+    outputs.clear();
+    outputs.reserve(impl_->output_names.size());
+    for (size_t i = 0; i < impl_->output_names.size(); ++i) {
+        utils::Tensor out;
+        out.info      = output_info_[i];
+        out.byte_size = impl_->user_output_raw[i].size;
+        out.data      = impl_->user_output_raw[i].AsU8();
+        out.owns_data = false;
+        outputs.push_back(std::move(out));
+    }
+
+    return utils::ErrorCode::kOk;
+}
+
 std::vector<utils::TensorInfo> SnpeBackend::GetInputInfo() const {
     return input_info_;
 }
@@ -454,13 +822,42 @@ std::vector<utils::TensorInfo> SnpeBackend::GetOutputInfo() const {
 }
 
 void SnpeBackend::Unload() {
+    // ── Release shared buffer back to pool before clearing anything ──
+    if (!impl_->shared_input_key.empty() && active_ctx_ != nullptr) {
+        auto& pool = active_ctx_->GetMemoryPool();
+        pool.ReleaseShared(impl_->shared_input_key);
+        // Nullify data pointers in user_input_raw so their destructors
+        // do not double-free pool-owned memory when the vector is cleared.
+        for (auto& buf : impl_->user_input_raw) {
+            buf.data = nullptr;
+            buf.size = 0;
+        }
+        impl_->shared_input_key.clear();
+    }
+
+    // UserBuffer path cleanup.
+    impl_->user_output_raw.clear();
+    impl_->user_input_raw.clear();
+    impl_->user_output_encodings.clear();
+    impl_->user_input_encodings.clear();
+    impl_->user_output_buffers.clear();
+    impl_->user_input_buffers.clear();
+    impl_->user_input_external.clear();
+    impl_->input_buffer_stride.clear();
+    impl_->output_buffer_stride.clear();
+
+    // ITensor path cleanup.
     impl_->snpe.reset();
     impl_->container.reset();
     impl_->input_names.clear();
     impl_->output_names.clear();
     impl_->input_tensors.clear();
+    impl_->use_buffer = false;
+
     input_info_.clear();
     output_info_.clear();
+    input_quant_params_.clear();
+    output_quant_params_.clear();
     model_config_ = core::ModelConfig();
     active_ctx_ = nullptr;
     loaded_ = false;
@@ -477,9 +874,15 @@ std::string SnpeBackend::Version() const {
 // ---------------------------------------------------------------------------
 
 utils::Span<void> SnpeBackend::GetInputBuffer(size_t index) const {
-    if (!loaded_ || index >= impl_->input_tensors.size()) {
-        return {};
+    if (!loaded_) return {};
+
+    if (impl_->use_buffer) {
+        if (index >= impl_->user_input_raw.size()) return {};
+        AlignedBuffer& buf = impl_->user_input_raw[index];
+        return { buf.data, buf.size };
     }
+
+    if (index >= impl_->input_tensors.size()) return {};
     auto* itensor = impl_->input_tensors[index].get();
     auto raw = itensor->begin();
     return utils::Span<void>(
@@ -488,24 +891,56 @@ utils::Span<void> SnpeBackend::GetInputBuffer(size_t index) const {
 }
 
 utils::Span<void> SnpeBackend::GetOutputBuffer(size_t index) const {
-    if (!loaded_ || index >= impl_->output_names.size()) {
-        return {};
+    if (!loaded_) return {};
+
+    if (impl_->use_buffer) {
+        if (index >= impl_->user_output_raw.size()) return {};
+        AlignedBuffer& buf = impl_->user_output_raw[index];
+        return { buf.data, buf.size };
     }
+
+    if (index >= impl_->output_names.size()) return {};
     zdl::DlSystem::ITensor* out_itensor =
         impl_->output_map.getTensor(impl_->output_names[index].c_str());
-    if (out_itensor == nullptr) {
-        return {};
-    }
+    if (out_itensor == nullptr) return {};
     auto raw_ptr = out_itensor->cbegin();
     return utils::Span<void>(
         const_cast<void*>(static_cast<const void*>(&(*raw_ptr))),
         out_itensor->getSize() * sizeof(float));
 }
 
+utils::ErrorCode SnpeBackend::SetInputBuffer(size_t index, void* external_mem,
+                                              size_t byte_size) {
+    if (!loaded_) return utils::ErrorCode::kNotInitialized;
+    if (!impl_->use_buffer) {
+        ATLAS_LOGE("SetInputBuffer requires use_buffer=true");
+        return utils::ErrorCode::kInvalidArgument;
+    }
+    if (index >= impl_->user_input_raw.size()) {
+        ATLAS_LOGE("SetInputBuffer index %zu out of range (max %zu)",
+                   index, impl_->user_input_raw.size());
+        return utils::ErrorCode::kInvalidArgument;
+    }
+    if (external_mem != nullptr &&
+        byte_size < impl_->user_input_raw[index].size) {
+        ATLAS_LOGE("SetInputBuffer[%zu] external buffer too small: "
+                   "need %zu, got %zu", index,
+                   impl_->user_input_raw[index].size, byte_size);
+        return utils::ErrorCode::kInvalidArgument;
+    }
+
+    impl_->user_input_external[index] = external_mem;
+    ATLAS_LOGD("SetInputBuffer[%zu] = %p (size=%zu)", index,
+               external_mem, byte_size);
+    return utils::ErrorCode::kOk;
+}
+
 utils::ErrorCode SnpeBackend::BuildTensorInfos() {
     ATLAS_LOGD("%s called", __FUNCTION__);
     input_info_.clear();
     output_info_.clear();
+    input_quant_params_.clear();
+    output_quant_params_.clear();
 
     for (const auto& name : impl_->input_names) {
         auto opt_attrs = impl_->snpe->getInputOutputBufferAttributes(name.c_str());
@@ -535,16 +970,23 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
             return utils::ErrorCode::kInferFailed;
         }
 
-        // Manifest config overrides (if present).
+        // Extract quantization params from runtime buffer attributes.
+        QuantParams qp = ExtractQuantParamsFromAttrs(opt_attrs->get());
+
+        // Manifest config overrides (if present) — manifest is first priority.
         for (const auto& mi : model_config_.inputs) {
             if (mi.name != name) continue;
             if (!mi.shape.empty())  info.shape  = mi.shape;
             if (!mi.layout.empty()) info.layout = mi.layout;
-            if (mi.dtype != utils::DataType::kUnknown) info.dtype = mi.dtype;
+            if (mi.dtype != utils::DataType::kUnknown) {
+                info.dtype = mi.dtype;
+                qp = QuantParamsForDtype(mi.dtype);  // reset quant params for new dtype
+            }
             break;
         }
 
         input_info_.push_back(std::move(info));
+        input_quant_params_.push_back(std::move(qp));
     }
 
     for (const auto& name : impl_->output_names) {
@@ -569,16 +1011,23 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
             return utils::ErrorCode::kInferFailed;
         }
 
-        // Manifest config overrides (if present).
+        // Extract quantization params from runtime buffer attributes.
+        QuantParams qp = ExtractQuantParamsFromAttrs(opt_attrs->get());
+
+        // Manifest config overrides (if present) — manifest is first priority.
         for (const auto& mo : model_config_.outputs) {
             if (mo.name != name) continue;
             if (!mo.shape.empty())  info.shape  = mo.shape;
             if (!mo.layout.empty()) info.layout = mo.layout;
-            if (mo.dtype != utils::DataType::kUnknown) info.dtype = mo.dtype;
+            if (mo.dtype != utils::DataType::kUnknown) {
+                info.dtype = mo.dtype;
+                qp = QuantParamsForDtype(mo.dtype);
+            }
             break;
         }
 
         output_info_.push_back(std::move(info));
+        output_quant_params_.push_back(std::move(qp));
     }
 
     return utils::ErrorCode::kOk;

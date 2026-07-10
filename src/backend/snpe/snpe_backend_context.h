@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "src/backend/base/i_backend_context.h"
+#include "src/backend/snpe/snpe_memory_pool.h"
 #include "src/utils/types.h"
 
 namespace atlas {
@@ -33,8 +34,13 @@ class SnpeBackendContext : public IBackendContext {
     utils::ErrorCode Init(const std::unordered_map<std::string,
                           std::string>& config);
 
+    // Returns the shared memory pool for this context.
+    // All SnpeBackend instances sharing this context share the pool.
+    SnpeMemoryPool& GetMemoryPool() { return memory_pool_; }
+
  private:
     [[maybe_unused]] bool initialized_ = false;
+    SnpeMemoryPool memory_pool_;
 };
 
 }  // namespace backend
