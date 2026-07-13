@@ -1,17 +1,19 @@
 #include "src/profiler/profiler.h"
 
-#include "src/profiler/profile_config.h"
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <chrono>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <vector>
 
-#include <sys/stat.h>
-#include <unistd.h>
+#include "src/profiler/profile_config.h"
 
 #define LOG_TAG "Atlas::Profiler"
 #include "src/utils/logger.h"
@@ -92,13 +94,19 @@ int NextCounter(const std::string& dir) {
 }  // namespace
 
 // ── Static shared state ──────────────────────────────────────
-FILE* Profiler::s_shared_fp_      = nullptr;
-int   Profiler::s_instance_count_ = 0;
-bool  Profiler::s_header_written_ = false;
+FILE*                       Profiler::s_shared_fp_      = nullptr;
+int                         Profiler::s_instance_count_ = 0;
+bool                        Profiler::s_header_written_ = false;
+std::vector<ProfileRecord>  Profiler::s_records_;
+std::mutex                  Profiler::s_mutex_;
+int                         Profiler::s_max_records_    = 100;
 
-Profiler::Profiler(const core::ProfileConfig& config, const std::string& model_id)
+Profiler::Profiler(const core::ProfileConfig& config,
+                   const std::string& model_id)
     : config_(&config), model_id_(model_id) {
     if (!config_->enabled) return;
+
+    std::lock_guard<std::mutex> lock(s_mutex_);
 
     if (s_instance_count_ == 0) {
         // First Profiler: open the file and write the CSV header.
@@ -120,9 +128,11 @@ Profiler::Profiler(const core::ProfileConfig& config, const std::string& model_i
         }
         // Write CSV header once.
         if (s_shared_fp_ != nullptr) {
-            std::fputs("model_id,phase,step,duration_ms,timestamp_ms\n", s_shared_fp_);
+            std::fputs("model_id,phase,step,duration_ms,timestamp_ms\n",
+                       s_shared_fp_);
         }
         s_header_written_ = true;
+        s_max_records_ = config_->max_records;
     }
 
     fp_ = s_shared_fp_;
@@ -130,14 +140,19 @@ Profiler::Profiler(const core::ProfileConfig& config, const std::string& model_i
 }
 
 Profiler::~Profiler() {
-    Flush();
+    if (!config_->enabled) return;
+
+    std::lock_guard<std::mutex> lock(s_mutex_);
     s_instance_count_--;
     if (s_instance_count_ == 0) {
+        // Last Profiler: flush remaining records and close.
+        FlushAll();
         if (s_shared_fp_ != nullptr && s_shared_fp_ != stdout) {
             std::fclose(s_shared_fp_);
         }
         s_shared_fp_      = nullptr;
         s_header_written_ = false;
+        s_records_.clear();
     }
 }
 
@@ -146,26 +161,31 @@ bool Profiler::ShouldProfile(const std::string& phase) const {
            core::ProfileModulesContain(config_->modules, phase);
 }
 
-void Profiler::Record(const std::string& phase, const std::string& step,
-                       double duration_ms) {
+void Profiler::Push(const std::string& phase, const std::string& step,
+                     double duration_ms) {
     if (fp_ == nullptr) return;
-    WriteLine(model_id_, phase, step, duration_ms, NowMs());
-    std::fflush(fp_);
-}
 
-void Profiler::BufferRecord(const std::string& phase, const std::string& step,
-                             double duration_ms) {
-    if (fp_ == nullptr) return;
-    records_.push_back({model_id_, phase, step, duration_ms, NowMs()});
-}
+    std::lock_guard<std::mutex> lock(s_mutex_);
+    s_records_.push_back({model_id_, phase, step, duration_ms, NowMs()});
 
-void Profiler::Flush() {
-    if (fp_ == nullptr || records_.empty()) return;
-    for (const auto& r : records_) {
-        WriteLine(r.model_id, r.phase, r.step, r.duration_ms, r.timestamp_ms);
+    // Auto-flush if max_records reached (0 means no limit).
+    if (s_max_records_ > 0 &&
+        static_cast<int>(s_records_.size()) >= s_max_records_) {
+        FlushAll();
     }
-    std::fflush(fp_);
-    records_.clear();
+}
+
+void Profiler::FlushAll() {
+    if (s_shared_fp_ == nullptr || s_records_.empty()) return;
+
+    // Flush must be called with s_mutex_ already held.
+    for (const auto& r : s_records_) {
+        std::fprintf(s_shared_fp_, "%s,%s,%s,%.3f,%lld\n",
+                     r.model_id.c_str(), r.phase.c_str(), r.step.c_str(),
+                     r.duration_ms, static_cast<long long>(r.timestamp_ms));
+    }
+    std::fflush(s_shared_fp_);
+    s_records_.clear();
 }
 
 // static
@@ -180,14 +200,6 @@ double Profiler::NowSteadyMs() {
     return std::chrono::duration<double, std::milli>(
                std::chrono::steady_clock::now().time_since_epoch())
         .count();
-}
-
-void Profiler::WriteLine(const std::string& model_id, const std::string& phase,
-                          const std::string& step, double duration_ms,
-                          int64_t timestamp_ms) {
-    std::fprintf(fp_, "%s,%s,%s,%.3f,%lld\n",
-                 model_id.c_str(), phase.c_str(), step.c_str(),
-                 duration_ms, static_cast<long long>(timestamp_ms));
 }
 
 }  // namespace backend

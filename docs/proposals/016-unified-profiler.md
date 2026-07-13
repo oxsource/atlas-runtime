@@ -17,7 +17,17 @@
 | 路径 | 位置 | 文件管理 | 写入时机 |
 |------|------|----------|----------|
 | **ProfilingBackend** | `src/backend/base/profiling_backend.cc` | `Flush()` 内 `fopen`/`fclose` | Load/Infer/Unload 完成后缓冲，Unload/析构时批量 flush |
-| **Pipeline profiling** | `src/api/model_handle.cc` 匿名空间 | 每个 `Run()` 调用 `fopen`/`fclose` | 每个 `Run()` 即时写入 |
+ | **Pipeline profiling** | `src/api/model_handle.cc` 匿名空间 | 每个 `Run()` 调用 `fopen`/`fclose` | 每个 `Run()` 即时写入 |
+
+### 1.3 后续优化
+
+在首次实现后，发现了以下问题并进行了修复：
+
+1. **forward 步骤重复记录**：`ModelHandle::Run()` 和 `ProfilingBackend::Infer()` 都在记录 `infer/forward`，导致每个 model 的 forward 计时被写入两次。修复方案：移除 `ModelHandle::Run()` 中的 forward 计时，统一由 `ProfilingBackend` 负责。
+
+2. **日志时间顺序混乱**：`ModelHandle::Run()` 使用 `Record()` 即时写入，而 `ProfilingBackend` 使用 `BufferRecord()` 延迟刷新，导致同一 model 的 input_pipeline/output_pipeline 排在 forward 前面。修复方案：将所有方法统一为 `Push()`，使用**共享静态缓冲区** `s_records_`，按 push 顺序写入 CSV，保持时间顺序。
+
+3. **API 命名统一**：`BufferRecord()` → `Push()`，`Record()` 方法移除，`Flush()` → `FlushAll()`（静态方法）。引入 `s_mutex_` 保护共享缓冲区，`s_max_records_` 支持自动 flush 阈值。
 
 ### 1.2 问题
 
@@ -49,10 +59,10 @@ ModelManager::Init()
   │     └→ fp_ = s_shared_fp_
   │
   ├→ ProfilingBackend(inner, &profiler)   ← 持有 Profiler*，不再管理文件
-  │     └→ profiler_->BufferRecord(...)
+  │     └→ profiler_->Push(...)
   │
   └→ ModelHandle::Run() 通过 entry_->profiler 访问
-        └→ profiler_->Record(...)
+        └→ profiler_->Push(...)
 
 最后一个 ~Profiler() → fclose + 重置静态状态
 ```
@@ -87,11 +97,9 @@ class Profiler {
     Profiler& operator=(const Profiler&) = delete;
 
     bool ShouldProfile(const std::string& phase) const;
-    void Record(const std::string& phase, const std::string& step,
-                double duration_ms);
-    void BufferRecord(const std::string& phase, const std::string& step,
-                      double duration_ms);
-    void Flush();
+    void Push(const std::string& phase, const std::string& step,
+              double duration_ms);
+    static void FlushAll();
 
     static int64_t NowMs();
     static double  NowSteadyMs();
@@ -104,14 +112,16 @@ class Profiler {
                    int64_t timestamp_ms);
 
     // ── 所有实例共享的静态状态 ─────────────────────────
-    static FILE* s_shared_fp_;
-    static int   s_instance_count_;
-    static bool  s_header_written_;
+    static FILE*                       s_shared_fp_;
+    static int                         s_instance_count_;
+    static bool                        s_header_written_;
+    static std::vector<ProfileRecord>  s_records_;
+    static std::mutex                  s_mutex_;
+    static int                         s_max_records_;
 
-    core::ProfileConfig         config_;
+    const core::ProfileConfig*  config_;
     std::string                 model_id_;
     FILE*                       fp_;               // == s_shared_fp_
-    std::vector<ProfileRecord>  records_;
 };
 
 }  // namespace backend
@@ -139,9 +149,9 @@ class ProfilingBackend : public IBackend {
 };
 ```
 
-- `Load()` / `Infer()` / `Unload()` 中：`if (ShouldProfile(...)) profiler_->BufferRecord(...)`
-- `Unload()` 最后调用 `profiler_->Flush()`
-- 析构函数调 `profiler_->Flush()` 确保数据落盘
+- `Load()` / `Infer()` / `Unload()` 中：`if (ShouldProfile(...)) profiler_->Push(...)`
+- 所有记录写入共享静态缓冲区 `s_records_`，达到 `max_records` 时自动 `FlushAll()`
+- 最后一个 `Profiler` 析构时自动 `FlushAll()` + `fclose()`
 
 ### 2.4 `ModelEntry` 变更
 
@@ -246,8 +256,8 @@ plate_recognition,infer,input_pipeline,0.234,...
 | 文件管理 | `ProfilingBackend` + `GetProfileOutput()` **两处** | `Profiler` 静态 `s_shared_fp_` **唯一一处**（所有实例共享） |
 | 表头写入 | `ProfilingBackend` `header_written_` + 局部变量 `csv_header` | `Profiler` `header_written_` |
 | CSV 写入 | `WriteCsv()` + `WritePipelineProfile()` | `Profiler::WriteLine()` |
-| 管道阶段耗时记录 | `model_handle.cc` 即时写 | `Profiler::Record()` 即时写 |
-| 后端耗时记录 | `ProfilingBackend` 缓冲后写 | `Profiler::BufferRecord()` + `Flush()` |
+| 管道阶段耗时记录 | `model_handle.cc` 即时写 | `Profiler::Push()` 共享缓冲区 |
+| 后端耗时记录 | `ProfilingBackend` 缓冲后写 | `Profiler::Push()` 共享缓冲区 |
 | 文件句柄生命周期 | 每个 `Run()` / `Flush()` 开关一次 | `Profiler` 构造到析构全程打开 |
 
 ---

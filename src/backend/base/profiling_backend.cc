@@ -15,9 +15,7 @@ ProfilingBackend::ProfilingBackend(std::unique_ptr<IBackend> inner,
     ATLAS_LOGD("ProfilingBackend created");
 }
 
-ProfilingBackend::~ProfilingBackend() {
-    if (profiler_) profiler_->Flush();
-}
+ProfilingBackend::~ProfilingBackend() = default;
 
 utils::ErrorCode ProfilingBackend::Load(const std::string& model_path,
                                          const core::ModelConfig& config,
@@ -27,7 +25,7 @@ utils::ErrorCode ProfilingBackend::Load(const std::string& model_path,
     const double elapsed = Profiler::NowSteadyMs() - t0;
 
     if (ShouldProfile(kProfilePhaseLoad)) {
-        profiler_->BufferRecord(kProfilePhaseLoad, kProfileStepTotal, elapsed);
+        profiler_->Push(kProfilePhaseLoad, kProfileStepTotal, elapsed);
     }
 
     return ret;
@@ -41,7 +39,7 @@ utils::ErrorCode ProfilingBackend::Infer(
     const double elapsed = Profiler::NowSteadyMs() - t0;
 
     if (ShouldProfile(kProfilePhaseInfer)) {
-        profiler_->BufferRecord(kProfilePhaseInfer, kProfileStepForward, elapsed);
+        profiler_->Push(kProfilePhaseInfer, kProfileStepForward, elapsed);
     }
 
     return ret;
@@ -53,10 +51,8 @@ void ProfilingBackend::Unload() {
     const double elapsed = Profiler::NowSteadyMs() - t0;
 
     if (ShouldProfile(kProfilePhaseUnload)) {
-        profiler_->BufferRecord(kProfilePhaseUnload, kProfileStepTotal, elapsed);
+        profiler_->Push(kProfilePhaseUnload, kProfileStepTotal, elapsed);
     }
-
-    if (profiler_) profiler_->Flush();
 }
 
 std::vector<utils::TensorInfo> ProfilingBackend::GetInputInfo() const {

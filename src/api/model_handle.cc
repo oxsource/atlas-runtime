@@ -60,13 +60,11 @@ utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
 
     if (profile_pipeline) {
         const double d = ProfileNowSteadyMs() - t_input_start;
-        entry_->profiler->Record(backend::kProfilePhaseInfer,
-                                  backend::kProfileStepInputPipeline, d);
+        entry_->profiler->Push(backend::kProfilePhaseInfer,
+                                backend::kProfileStepInputPipeline, d);
     }
 
     // ── Phase 2: forward (Infer) ─────────────────────────────
-    const double t_forward_start = profile_pipeline ? ProfileNowSteadyMs() : 0;
-
     std::vector<utils::Tensor> inputs;
     if (preprocessed.info.shape.size() == 3) {
         preprocessed.info.shape.insert(preprocessed.info.shape.begin(), 1);
@@ -76,12 +74,6 @@ utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
     std::vector<utils::Tensor> raw_outputs;
     auto ret = entry_->backend->Infer(inputs, raw_outputs);
     if (ret != utils::ErrorCode::kOk) return ret;
-
-    if (profile_pipeline) {
-        const double d = ProfileNowSteadyMs() - t_forward_start;
-        entry_->profiler->Record(backend::kProfilePhaseInfer,
-                                  backend::kProfileStepForward, d);
-    }
 
     // ── Phase 3: output_pipeline ─────────────────────────────
     const double t_output_start = profile_pipeline ? ProfileNowSteadyMs() : 0;
@@ -103,8 +95,8 @@ utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
 
     if (profile_pipeline) {
         const double d = ProfileNowSteadyMs() - t_output_start;
-        entry_->profiler->Record(backend::kProfilePhaseInfer,
-                                  backend::kProfileStepOutputPipeline, d);
+        entry_->profiler->Push(backend::kProfilePhaseInfer,
+                                backend::kProfileStepOutputPipeline, d);
     }
 
     return utils::ErrorCode::kOk;
@@ -152,22 +144,14 @@ utils::ErrorCode ModelHandle::Run(const std::vector<utils::Tensor>& raw_inputs,
 
     if (profile_pipeline) {
         const double d = ProfileNowSteadyMs() - t_input_start;
-        entry_->profiler->Record(backend::kProfilePhaseInfer,
-                                  backend::kProfileStepInputPipeline, d);
+        entry_->profiler->Push(backend::kProfilePhaseInfer,
+                                backend::kProfileStepInputPipeline, d);
     }
 
     // ── Phase 2: forward (Infer) ─────────────────────────────
-    const double t_forward_start = profile_pipeline ? ProfileNowSteadyMs() : 0;
-
     std::vector<utils::Tensor> raw_outputs;
     auto ret = entry_->backend->Infer(preprocessed, raw_outputs);
     if (ret != utils::ErrorCode::kOk) return ret;
-
-    if (profile_pipeline) {
-        const double d = ProfileNowSteadyMs() - t_forward_start;
-        entry_->profiler->Record(backend::kProfilePhaseInfer,
-                                  backend::kProfileStepForward, d);
-    }
 
     // ── Phase 3: output_pipeline ─────────────────────────────
     const double t_output_start = profile_pipeline ? ProfileNowSteadyMs() : 0;
@@ -189,8 +173,8 @@ utils::ErrorCode ModelHandle::Run(const std::vector<utils::Tensor>& raw_inputs,
 
     if (profile_pipeline) {
         const double d = ProfileNowSteadyMs() - t_output_start;
-        entry_->profiler->Record(backend::kProfilePhaseInfer,
-                                  backend::kProfileStepOutputPipeline, d);
+        entry_->profiler->Push(backend::kProfilePhaseInfer,
+                                backend::kProfileStepOutputPipeline, d);
     }
 
     return utils::ErrorCode::kOk;

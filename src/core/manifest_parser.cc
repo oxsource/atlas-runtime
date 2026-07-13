@@ -87,6 +87,7 @@ constexpr const char* kKeyParams           = "params";
 constexpr const char* kKeyProfileEnabled   = "enabled";
 constexpr const char* kKeyProfileOutput    = "output_path";
 constexpr const char* kKeyProfileModules   = "modules";
+constexpr const char* kKeyProfileMaxRecords = "max_records";
 
 // ---------------------------------------------------------------------------
 // Helper functions
@@ -389,10 +390,14 @@ utils::ErrorCode ManifestParser::Parse(const std::string& path,
         if (p.contains(kKeyProfileModules) && p[kKeyProfileModules].is_string()) {
             config->profile.modules = p[kKeyProfileModules].get<std::string>();
         }
-        ATLAS_LOGD("profile: enabled=%d, output=%s, modules=%s",
+        if (p.contains(kKeyProfileMaxRecords) && p[kKeyProfileMaxRecords].is_number_integer()) {
+            config->profile.max_records = p[kKeyProfileMaxRecords].get<int>();
+        }
+        ATLAS_LOGD("profile: enabled=%d, output=%s, modules=%s, max_records=%d",
                    static_cast<int>(config->profile.enabled),
                    config->profile.output_path.c_str(),
-                   config->profile.modules.c_str());
+                   config->profile.modules.c_str(),
+                   config->profile.max_records);
     }
 
     // Validate models array is present and non-empty.
