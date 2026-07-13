@@ -106,7 +106,7 @@ struct NormalizeParams {
 struct TensorInfo {
     std::string name;
     std::vector<int> shape;
-    DataType dtype = DataType::kFloat32;
+    DataType dtype = DataType::kUnknown;
     std::string layout = "NCHW";
     bool has_normalize = false;
     NormalizeParams normalize;

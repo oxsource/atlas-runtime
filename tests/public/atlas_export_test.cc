@@ -84,7 +84,7 @@ TEST(AtlasExportTest, TensorMoveSemantics) {
 // Verify TensorInfo default values.
 TEST(AtlasExportTest, TensorInfoDefaults) {
     atlas::utils::TensorInfo info;
-    EXPECT_EQ(info.dtype, atlas::utils::DataType::kFloat32);
+    EXPECT_EQ(info.dtype, atlas::utils::DataType::kUnknown);
     EXPECT_EQ(info.layout, "NCHW");
     EXPECT_FALSE(info.has_normalize);
 }

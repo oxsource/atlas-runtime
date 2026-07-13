@@ -29,7 +29,7 @@ struct ManifestPipelineNode {
 struct ManifestTensorInfo {
     std::string name;
     std::vector<int> shape;
-    utils::DataType dtype = utils::DataType::kFloat32;
+    utils::DataType dtype = utils::DataType::kUnknown;
     std::string layout = "NCHW";
     bool has_normalize = false;
     utils::NormalizeParams normalize;

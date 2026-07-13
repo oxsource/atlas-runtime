@@ -167,12 +167,13 @@ utils::ErrorCode ParseTensorInfo(const nlohmann::json& j,
         info->shape.push_back(dim.get<int>());
     }
 
-    if (!j.contains(kKeyDtype) || !j[kKeyDtype].is_string()) {
-        return utils::ErrorCode::kParseError;
-    }
-    info->dtype = StringToDataType(j[kKeyDtype].get<std::string>());
-    if (info->dtype == utils::DataType::kUnknown) {
-        return utils::ErrorCode::kParseError;
+    // dtype is optional. When absent, kUnknown is set so the backend
+    // can use the DLC native encoding (e.g. TF8 quantization params).
+    if (j.contains(kKeyDtype) && j[kKeyDtype].is_string()) {
+        info->dtype = StringToDataType(j[kKeyDtype].get<std::string>());
+        if (info->dtype == utils::DataType::kUnknown) {
+            return utils::ErrorCode::kParseError;
+        }
     }
 
     if (j.contains(kKeyLayout) && j[kKeyLayout].is_string()) {
