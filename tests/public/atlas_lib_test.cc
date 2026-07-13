@@ -47,7 +47,10 @@ std::string SingleModelManifest(const std::string& model_path) {
     "backend": "cpu",
     "model_path": ")" + model_path + R"(",
     "load_strategy": "eager",
-    "inputs":  [{"name":"images","shape":[1,3,4,4],"dtype":"float32"}],
+    "inputs":  [{"name":"images","shape":[1,3,4,4],"dtype":"float32","pipeline":[
+      {"name":"atlas::dtype_convert","params":{"target":"float32"}},
+      {"name":"atlas::hwc_to_chw"}
+    ]}],
     "outputs": [{"name":"output","shape":[1,3,4,4],"dtype":"float32"}],
     "config": {"num_threads":"1"}
   }]

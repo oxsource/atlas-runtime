@@ -1,7 +1,7 @@
 cc_library(
     name = "pipeline_node",
     hdrs = ["pipeline_node.h"],
-    deps = ["//src/utils:types"],
+    deps = ["//src/public:types"],
     visibility = ["//visibility:public"],
 )
 

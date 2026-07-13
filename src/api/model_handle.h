@@ -31,14 +31,18 @@ class ModelHandle {
     //
     // @param raw_input  Source tensor (e.g. HWC uint8 image).
     // @param outputs    Populated with inference results on success.
+    // @param user       Optional user-defined data forwarded to pipeline nodes.
     // @return kOk on success; kNotInitialized if IsValid() == false.
     utils::ErrorCode Run(const utils::Tensor& raw_input,
-                          std::vector<utils::Tensor>* outputs);
+                          std::vector<utils::Tensor>* outputs,
+                          const utils::UserData& user = {});
 
     // Multi-input overload: runs each input through its corresponding
     // pipeline, then passes all preprocessed inputs to IBackend::Infer().
+    // |user| is forwarded to IPipelineNode::Context for each node.
     utils::ErrorCode Run(const std::vector<utils::Tensor>& raw_inputs,
-                          std::vector<utils::Tensor>* outputs);
+                          std::vector<utils::Tensor>* outputs,
+                          const utils::UserData& user = {});
 
     // Returns input / output tensor metadata from the backend.
     // Both return empty vectors if IsValid() == false.

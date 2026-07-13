@@ -9,6 +9,15 @@ load("//third_party/onnxruntime:defs.bzl", "onnxruntime_deps")
 load("//third_party/snpe:defs.bzl", "snpe_sdk_deps")
 
 cc_library(
+    name = "types",
+    hdrs = glob(["include/atlas/*.h"]),
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+)
+
+
+
+cc_library(
     name = "atlas",
     hdrs = glob(["include/atlas/*.h"]),
     strip_include_prefix = "include",

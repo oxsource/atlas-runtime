@@ -29,7 +29,8 @@ bool ModelHandle::IsValid() const {
 }
 
 utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
-                                   std::vector<utils::Tensor>* outputs) {
+                                   std::vector<utils::Tensor>* outputs,
+                                   const utils::UserData& cfg) {
     if (outputs == nullptr) return utils::ErrorCode::kInvalidArgument;
     if (!IsValid())         return utils::ErrorCode::kNotInitialized;
 
@@ -42,7 +43,8 @@ utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
     pipeline::IPipelineNode::Context ctx;
     ctx.config  = &entry_->config;
     ctx.backend = entry_->backend.get();
-    ctx.flags   = pipeline::kPipeFlagInputPipe;
+    ctx.user    = cfg;
+    ctx.user.flags |= pipeline::kPipeFlagInputPipe;
 
     utils::Tensor preprocessed;
     if (!entry_->input_pipelines.empty()) {
@@ -85,7 +87,7 @@ utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
     const double t_output_start = profile_pipeline ? ProfileNowSteadyMs() : 0;
 
     outputs->clear();
-    ctx.flags = pipeline::kPipeFlagOutputPipe;
+    ctx.user.flags = (cfg.flags & ~0x03) | pipeline::kPipeFlagOutputPipe;
     for (size_t i = 0; i < raw_outputs.size(); ++i) {
         ctx.output_index = i;
         if (i < entry_->output_pipelines.size() &&
@@ -109,7 +111,8 @@ utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
 }
 
 utils::ErrorCode ModelHandle::Run(const std::vector<utils::Tensor>& raw_inputs,
-                                   std::vector<utils::Tensor>* outputs) {
+                                   std::vector<utils::Tensor>* outputs,
+                                   const utils::UserData& cfg) {
     if (outputs == nullptr) return utils::ErrorCode::kInvalidArgument;
     if (!IsValid())         return utils::ErrorCode::kNotInitialized;
 
@@ -122,7 +125,8 @@ utils::ErrorCode ModelHandle::Run(const std::vector<utils::Tensor>& raw_inputs,
     pipeline::IPipelineNode::Context ctx;
     ctx.config  = &entry_->config;
     ctx.backend = entry_->backend.get();
-    ctx.flags   = pipeline::kPipeFlagInputPipe;
+    ctx.user    = cfg;
+    ctx.user.flags |= pipeline::kPipeFlagInputPipe;
 
     std::vector<utils::Tensor> preprocessed;
     preprocessed.reserve(raw_inputs.size());
@@ -169,7 +173,7 @@ utils::ErrorCode ModelHandle::Run(const std::vector<utils::Tensor>& raw_inputs,
     const double t_output_start = profile_pipeline ? ProfileNowSteadyMs() : 0;
 
     outputs->clear();
-    ctx.flags = pipeline::kPipeFlagOutputPipe;
+    ctx.user.flags = (cfg.flags & ~0x03) | pipeline::kPipeFlagOutputPipe;
     for (size_t i = 0; i < raw_outputs.size(); ++i) {
         ctx.output_index = i;
         if (i < entry_->output_pipelines.size() &&

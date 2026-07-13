@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <string_view>
 
+#include "atlas/types.h"
+
 namespace atlas {
 namespace core { struct ModelConfig; }
 namespace backend { class IBackend; }
@@ -35,8 +37,7 @@ class IPipelineNode {
         const backend::IBackend*  backend  = nullptr;  // Backend for zero-copy buffer access
         size_t                    input_index  = 0;  // Current input index
         size_t                    output_index = 0;  // Current output index
-        uint8_t                   flags    = 0;        // Bitmask (see kPipeFlag*)
-        void*                     args     = nullptr;  // User-defined extension data
+        utils::UserData             user;               // User-defined extension data & pipeline flags
     };
 
     virtual ~IPipelineNode() = default;

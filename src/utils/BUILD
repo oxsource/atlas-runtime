@@ -1,6 +1,7 @@
 cc_library(
     name = "types",
     hdrs = ["types.h"],
+    deps = ["//src/public:types"],
     visibility = ["//visibility:public"],
 )
 
@@ -19,12 +20,6 @@ cc_library(
     name = "version",
     srcs = ["version.cc"],
     hdrs = ["version.h"],
-    visibility = ["//visibility:public"],
-)
-
-cc_library(
-    name = "span",
-    hdrs = ["span.h"],
     visibility = ["//visibility:public"],
 )
 
