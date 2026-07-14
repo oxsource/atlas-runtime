@@ -13,6 +13,7 @@
 
 namespace atlas {
 namespace backend {
+namespace snpe {
 
 // ===================================================================
 // === Stub implementation (non-target platforms) ===
@@ -99,7 +100,8 @@ std::string SnpeBackend::Version() const {
     return "stub";
 }
 
+}  // namespace snpe
 }  // namespace backend
 }  // namespace atlas
 
-ATLAS_REGISTER_BACKEND("snpe", atlas::backend::SnpeBackend)
+ATLAS_REGISTER_BACKEND("snpe", atlas::backend::snpe::SnpeBackend)

@@ -10,6 +10,7 @@
 
 namespace atlas {
 namespace backend {
+namespace snpe {
 
 // Shared SNPE runtime context for all SnpeBackend instances.
 //
@@ -32,7 +33,7 @@ class SnpeBackendContext : public IBackendContext {
     //
     // Idempotent: subsequent calls after the first are no-ops.
     utils::ErrorCode Init(const std::unordered_map<std::string,
-                          std::string>& config);
+                          std::string>& config) override;
 
     // Returns the shared memory pool for this context.
     // All SnpeBackend instances sharing this context share the pool.
@@ -43,5 +44,6 @@ class SnpeBackendContext : public IBackendContext {
     SnpeMemoryPool memory_pool_;
 };
 
+}  // namespace snpe
 }  // namespace backend
 }  // namespace atlas

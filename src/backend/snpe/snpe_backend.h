@@ -11,6 +11,7 @@
 
 namespace atlas {
 namespace backend {
+namespace snpe {
 
 class SnpeBackendContext;
 
@@ -95,5 +96,6 @@ class SnpeBackend : public IBackend {
     std::unique_ptr<SnpeImpl> impl_;
 };
 
+}  // namespace snpe
 }  // namespace backend
 }  // namespace atlas

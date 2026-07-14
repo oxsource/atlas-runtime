@@ -1,7 +1,6 @@
 // Copyright 2026 The Atlas Authors
 // Minimal Android native example that only emits logs.
 
-#include <cstdio>
 #include <string>
 
 #include "src/backend/snpe/snpe_backend_context.h"
@@ -14,8 +13,8 @@ int main(int argc, char* argv[]) {
     atlas::utils::Logger::SetLevel(atlas::utils::Logger::Level::Debug);
     ATLAS_LOGD("example started");
 
-    atlas::backend::SnpeBackendContext backend_context;
-    atlas::backend::SnpeBackend backend;
+    atlas::backend::snpe::SnpeBackendContext backend_context;
+    atlas::backend::snpe::SnpeBackend backend;
     const std::string backend_version =
         std::string(backend_context.BackendType()) + "-" + backend.Version();
     ATLAS_LOGD("snpe backend version: %s", backend_version.c_str());

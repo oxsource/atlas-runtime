@@ -7,6 +7,7 @@
 ## Naming
 - Files: `snake_case.cc/.h` | Test files: `<module>_test.cc`
 - Namespace: ≥2 layers `atlas::<module>` | Classes: `PascalCase` | Interfaces: `IPrefix`
+- Backend namespace: each backend type gets a dedicated third layer: `atlas::backend::<type>` (e.g. `atlas::backend::snpe`, `atlas::backend::cpu`). This prevents inline function name collisions between different backends.
 - Functions: `PascalCase` | Locals: `snake_case` | Members: `snake_case_` | Statics: `s_snake_case_`
 - Constants/Enums: `kPascalCase` | Macros: `ATLAS_ALL_CAPS`
 - `} // namespace xxx` required after every namespace close

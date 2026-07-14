@@ -11,7 +11,11 @@
 
 namespace atlas {
 namespace backend {
+namespace snpe {
 namespace {
+
+using atlas::backend::snpe::SnpeBackend;
+using atlas::backend::snpe::SnpeBackendContext;
 
 constexpr std::string_view kBackendName = "snpe";
 
@@ -197,5 +201,6 @@ TEST_F(SnpeBackendTest, ContextPoolWithoutSharedNoOp) {
 }
 
 }  // namespace
+}  // namespace snpe
 }  // namespace backend
 }  // namespace atlas

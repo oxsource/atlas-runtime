@@ -13,6 +13,7 @@
 
 namespace atlas {
 namespace backend {
+namespace snpe {
 
 namespace {
 constexpr std::string_view kBackendType = "snpe";
@@ -45,7 +46,8 @@ utils::ErrorCode SnpeBackendContext::Init(
     return utils::ErrorCode::kOk;
 }
 
+}  // namespace snpe
 }  // namespace backend
 }  // namespace atlas
 
-ATLAS_REGISTER_BACKEND_CONTEXT("snpe", atlas::backend::SnpeBackendContext)
+ATLAS_REGISTER_BACKEND_CONTEXT("snpe", atlas::backend::snpe::SnpeBackendContext)

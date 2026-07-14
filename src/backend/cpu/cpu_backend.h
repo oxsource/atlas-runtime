@@ -13,6 +13,7 @@
 
 namespace atlas {
 namespace backend {
+namespace cpu {
 
 // CPU inference backend implemented on top of ONNX Runtime.
 // Register via ATLAS_REGISTER_BACKEND("cpu", CpuBackend).
@@ -60,5 +61,6 @@ class CpuBackend : public IBackend {
     bool loaded_ = false;
 };
 
+}  // namespace cpu
 }  // namespace backend
 }  // namespace atlas

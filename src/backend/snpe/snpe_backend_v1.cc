@@ -35,6 +35,7 @@
 
 namespace atlas {
 namespace backend {
+namespace snpe {
 
 // Define SnpeBackend::SnpeImpl (nested type matching header fwd declaration).
 struct SnpeBackend::SnpeImpl {
@@ -995,7 +996,8 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
     return utils::ErrorCode::kOk;
 }
 
+}  // namespace snpe
 }  // namespace backend
 }  // namespace atlas
 
-ATLAS_REGISTER_BACKEND("snpe", atlas::backend::SnpeBackend)
+ATLAS_REGISTER_BACKEND("snpe", atlas::backend::snpe::SnpeBackend)

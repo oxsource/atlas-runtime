@@ -13,7 +13,10 @@
 
 namespace atlas {
 namespace backend {
+namespace cpu {
 namespace {
+
+using atlas::backend::cpu::CpuBackend;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -164,5 +167,6 @@ TEST_F(CpuBackendTest, BackendFactoryCreatesCpuBackend) {
 }
 
 }  // namespace
+}  // namespace cpu
 }  // namespace backend
 }  // namespace atlas

@@ -2,7 +2,8 @@
 
 #include <string_view>
 
-#include "DlSystem/DlEnums.hpp"
+// SNPE 2.x headers dropped the zdl:: prefix.
+
 #include "SNPE/SNPEFactory.hpp"
 
 #include "src/backend/base/backend_factory.h"
@@ -12,6 +13,7 @@
 
 namespace atlas {
 namespace backend {
+namespace snpe {
 
 namespace {
 constexpr std::string_view kBackendType = "snpe";
@@ -22,10 +24,8 @@ constexpr std::string_view kBackendType = "snpe";
 SnpeBackendContext::SnpeBackendContext() = default;
 
 SnpeBackendContext::~SnpeBackendContext() {
-    if (initialized_) {
-        ATLAS_LOGD("terminateLogging");
-        SNPE::SNPEFactory::terminateLogging();
-    }
+    ATLAS_LOGD("%s called", __FUNCTION__);
+    SNPE::SNPEFactory::terminateLogging();
 }
 
 std::string_view SnpeBackendContext::BackendType() const {
@@ -41,18 +41,14 @@ utils::ErrorCode SnpeBackendContext::Init(
     // per-model fields (runtime, performance_profile, use_buffer) are ignored.
     (void)config;
 
-    // 2.x: initializeLogging with LogLevel_t parameter.
-    if (!SNPE::SNPEFactory::initializeLogging(DlSystem::LogLevel_t::LOG_WARN)) {
-        ATLAS_LOGE("SNPE initializeLogging failed");
-        return utils::ErrorCode::kInferFailed;
-    }
-
+    SNPE::SNPEFactory::initializeLogging();
     initialized_ = true;
     ATLAS_LOGI("SnpeBackendContext initialized (SNPE 2.x)");
     return utils::ErrorCode::kOk;
 }
 
+}  // namespace snpe
 }  // namespace backend
 }  // namespace atlas
 
-ATLAS_REGISTER_BACKEND_CONTEXT("snpe", atlas::backend::SnpeBackendContext)
+ATLAS_REGISTER_BACKEND_CONTEXT("snpe", atlas::backend::snpe::SnpeBackendContext)

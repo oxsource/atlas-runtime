@@ -62,13 +62,13 @@ class BackendFactory {
 // Convenience macro for registering a backend from its own translation unit.
 // Place this macro at the end of the backend's .cc file, outside any namespace.
 // |name| is the string key (e.g. "cpu"); |cls| is the fully-qualified class
-// name (e.g. atlas::backend::CpuBackend).
+// name (e.g. atlas::backend::cpu::CpuBackend).
 //
 // __COUNTER__ is used to generate a unique variable name so that |cls| may
 // contain namespace separators (::) without breaking token-paste (##).
 //
 // Example:
-//   ATLAS_REGISTER_BACKEND("cpu", atlas::backend::CpuBackend)
+//   ATLAS_REGISTER_BACKEND("cpu", atlas::backend::cpu::CpuBackend)
 #define ATLAS_REGISTER_BACKEND_IMPL_(name, cls, counter)                \
     namespace {                                                           \
     const bool kAtlasBackendRegistered_##counter = []() {               \
@@ -83,7 +83,7 @@ class BackendFactory {
 
 // Registers a context creator.  Use at the end of a backend context .cc file.
 // Example:
-//   ATLAS_REGISTER_BACKEND_CONTEXT("cpu", atlas::backend::CpuBackendContext)
+//   ATLAS_REGISTER_BACKEND_CONTEXT("cpu", atlas::backend::cpu::CpuBackendContext)
 #define ATLAS_REGISTER_BACKEND_CONTEXT_IMPL_(name, ctx_cls, counter)         \
     namespace {                                                                \
     const bool kAtlasCtxRegistered_##counter = []() {                        \

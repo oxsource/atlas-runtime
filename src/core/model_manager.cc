@@ -32,8 +32,17 @@ utils::ErrorCode ModelManager::Init(const ManifestConfig& manifest) {
             ATLAS_LOGD("creating context for backend: %s", model.backend.c_str());
             auto ctx = factory.CreateContext(model.backend);
             if (ctx != nullptr) {
+                // Initialize the shared context with the first model's config.
+                auto init_ret = ctx->Init(model.config);
+                if (init_ret != utils::ErrorCode::kOk) {
+                    ATLAS_LOGE("context Init failed for backend: %s (error=%d)",
+                               model.backend.c_str(), static_cast<int>(init_ret));
+                    ReleaseAll();
+                    return init_ret;
+                }
                 contexts_.emplace(model.backend, std::move(ctx));
-                ATLAS_LOGD("context created for backend: %s", model.backend.c_str());
+                ATLAS_LOGD("context created and initialized for backend: %s",
+                           model.backend.c_str());
             }
             // No context is also valid — backend falls back to own resource.
         }

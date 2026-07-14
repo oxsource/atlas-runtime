@@ -143,7 +143,7 @@ TEST(ModelManagerTest, ReleaseAllClearsEntries) {
 // ---------------------------------------------------------------------------
 
 TEST(CpuBackendContextTest, BackendTypeIsCpu) {
-    backend::CpuBackendContext ctx;
+    backend::cpu::CpuBackendContext ctx;
     EXPECT_EQ(ctx.BackendType(), "cpu");
 }
 

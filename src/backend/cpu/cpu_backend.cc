@@ -14,6 +14,7 @@
 
 namespace atlas {
 namespace backend {
+namespace cpu {
 
 namespace {
 
@@ -300,7 +301,8 @@ utils::ErrorCode CpuBackend::BuildTensorInfos() {
     return utils::ErrorCode::kOk;
 }
 
+}  // namespace cpu
 }  // namespace backend
 }  // namespace atlas
 
-ATLAS_REGISTER_BACKEND("cpu", atlas::backend::CpuBackend)
+ATLAS_REGISTER_BACKEND("cpu", atlas::backend::cpu::CpuBackend)

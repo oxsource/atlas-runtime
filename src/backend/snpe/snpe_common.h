@@ -1,7 +1,3 @@
-// Copyright (c) 2026 Qualcomm Technologies, Inc.
-// All Rights Reserved.
-// Confidential and Proprietary - Qualcomm Technologies, Inc.
-
 #pragma once
 
 #include <algorithm>
@@ -11,10 +7,16 @@
 
 #include "src/utils/types.h"
 
+// Shared SNPE backend utilities extracted from snpe_backend_v1.cc and
+// snpe_backend_v2.cc to eliminate code duplication.
+//
+// These functions are used by both SDK v1.x and v2.x implementations.
+
 namespace atlas {
 namespace backend {
+namespace snpe {
 
-// DSP/HTP buffer alignment requirement.
+// Aligned memory alignment constant for DSP/HTP buffers.
 constexpr size_t kBufferAlignment = 128;
 
 // Computes per-dimension byte strides for a UserBuffer.
@@ -43,7 +45,7 @@ inline void AdaptU8ToTf8(const void* src, void* dst, size_t count) {
     }
 }
 
-// Returns true if the input at |index| needs U8 -> TF8 conversion.
+// Returns true if the input at |index| needs U8->TF8 conversion.
 inline bool NeedsQuantizationAdaptation(
     const std::vector<utils::TensorInfo>& info,
     size_t index, utils::DataType input_dtype) {
@@ -51,5 +53,6 @@ inline bool NeedsQuantizationAdaptation(
             input_dtype == utils::DataType::kUInt8);
 }
 
+}  // namespace snpe
 }  // namespace backend
 }  // namespace atlas
