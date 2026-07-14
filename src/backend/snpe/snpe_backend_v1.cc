@@ -26,6 +26,7 @@
 #include "src/backend/base/backend_factory.h"
 #include "src/backend/snpe/snpe_aligned_buffer.h"
 #include "src/backend/snpe/snpe_backend_context.h"
+#include "src/backend/snpe/snpe_common.h"
 #include "src/backend/snpe/snpe_memory_pool.h"
 #include "src/utils/types.h"
 
@@ -150,8 +151,9 @@ utils::DataType ParseDataType(
             return utils::DataType::kFloat32;
         case zdl::DlSystem::UserBufferEncoding::ElementType_t::TF8:
             return utils::DataType::kInt8;
-        case zdl::DlSystem::UserBufferEncoding::ElementType_t::UNSIGNED8BIT:
         case zdl::DlSystem::UserBufferEncoding::ElementType_t::TF16:
+            return utils::DataType::kFloat16;
+        case zdl::DlSystem::UserBufferEncoding::ElementType_t::UNSIGNED8BIT:
             return utils::DataType::kUInt8;
         default:
             return utils::DataType::kUnknown;
@@ -202,42 +204,8 @@ int ParsePerformanceProfile(const std::string& profile_str) {
     return static_cast<int>(zdl::DlSystem::PerformanceProfile_t::BALANCED);
 }
 
-// Aligned memory alignment constant for DSP/HTP buffers.
-constexpr size_t kBufferAlignment = 128;
-
-// Computes per-dimension byte strides for a UserBuffer.
-// Stride[d] = element_size * prod(shape[d+1], ..., shape[rank-1]).
-// This formula works for any layout because the stride array order matches
-// the shape array order.
-std::vector<size_t> ComputeUserBufferStride(const std::vector<int>& shape,
-                                             size_t element_size) {
-    const size_t rank = shape.size();
-    if (rank == 0) return {};
-    std::vector<size_t> stride(rank, element_size);
-    for (size_t i = rank; i > 1; --i) {
-        stride[i - 2] = stride[i - 1] *
-            static_cast<size_t>(std::max(shape[i - 1], 1));
-    }
-    return stride;
-}
-
-// Adapts uint8_t input data to int8_t (TF8) by subtracting 128.
-// This is a simple range shift: [0, 255] -> [-128, 127].
-void AdaptU8ToTf8(const void* src, void* dst, size_t count) {
-    const auto* u8_src = static_cast<const uint8_t*>(src);
-    auto* s8_dst = static_cast<int8_t*>(dst);
-    for (size_t i = 0; i < count; ++i) {
-        s8_dst[i] = static_cast<int8_t>(static_cast<int>(u8_src[i]) - 128);
-    }
-}
-
-// Returns true if the input at |index| needs U8->TF8 conversion.
-bool NeedsQuantizationAdaptation(
-    const std::vector<utils::TensorInfo>& info,
-    size_t index, utils::DataType input_dtype) {
-    return (info[index].dtype == utils::DataType::kInt8 &&
-            input_dtype == utils::DataType::kUInt8);
-}
+// kBufferAlignment, ComputeUserBufferStride, AdaptU8ToTf8,
+// and NeedsQuantizationAdaptation are defined in snpe_common.h.
 
 // Creates the appropriate UserBufferEncoding subclass for the given
 // dtype and quantization parameters.  Returns nullptr on error.
@@ -252,6 +220,11 @@ std::unique_ptr<zdl::DlSystem::UserBufferEncoding> CreateEncoding(
         case utils::DataType::kFloat32:
             return std::make_unique<zdl::DlSystem::UserBufferEncodingFloat>();
         case utils::DataType::kInt8:
+            return std::make_unique<zdl::DlSystem::UserBufferEncodingTfN>(
+                zero_point, scale, bandwidth);
+        case utils::DataType::kFloat16:
+            // v1 has no UserBufferEncodingFloat16; TF16 is represented
+            // as TfN with bandwidth=16 (same approach as SDK v1.50.0).
             return std::make_unique<zdl::DlSystem::UserBufferEncodingTfN>(
                 zero_point, scale, bandwidth);
         case utils::DataType::kUInt8:
@@ -289,6 +262,8 @@ SnpeBackend::QuantParams QuantParamsForDtype(utils::DataType dtype) {
     SnpeBackend::QuantParams qp;
     if (dtype == utils::DataType::kInt8) {
         qp = {1.0f, 0, 8};
+    } else if (dtype == utils::DataType::kFloat16) {
+        qp = {1.0f, 0, 16};
     }
     return qp;
 }

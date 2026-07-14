@@ -38,6 +38,13 @@ cc_library(
 )
 
 cc_library(
+    name = "snpe_common",
+    hdrs = ["snpe_common.h"],
+    deps = ["//src/utils:types"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
     name = "snpe_memory_pool",
     hdrs = ["snpe_memory_pool.h"],
     deps = [":snpe_aligned_buffer"],
@@ -52,6 +59,7 @@ cc_library(
     deps = [
         ":snpe_aligned_buffer",
         ":snpe_backend_context",
+        ":snpe_common",
         "//src/backend/base:backend_factory",
         "//src/backend/base:i_backend",
         "//src/core:manifest_config",

@@ -22,6 +22,7 @@
 #include "src/backend/base/backend_factory.h"
 #include "src/backend/snpe/snpe_aligned_buffer.h"
 #include "src/backend/snpe/snpe_backend_context.h"
+#include "src/backend/snpe/snpe_common.h"
 #include "src/backend/snpe/snpe_memory_pool.h"
 #include "src/utils/types.h"
 
@@ -70,6 +71,7 @@ constexpr char kConfigRuntime[]    = "runtime";
 constexpr char kConfigPerfProfile[] = "performance_profile";
 constexpr char kConfigUseBuffer[]  = "use_buffer";
 constexpr char kConfigSharedInput[] = "shared_input";
+constexpr char kConfigCpuFixedPoint[] = "cpu_fixed_point";
 
 // Runtime name strings accepted from manifest config.
 constexpr char kRuntimeCpu[] = "cpu";
@@ -199,38 +201,8 @@ int ParsePerformanceProfile(const std::string& profile_str) {
     return static_cast<int>(DlSystem::PerformanceProfile_t::BALANCED);
 }
 
-// Aligned memory alignment constant for DSP/HTP buffers.
-constexpr size_t kBufferAlignment = 128;
-
-// Computes per-dimension byte strides for a UserBuffer.
-std::vector<size_t> ComputeUserBufferStride(const std::vector<int>& shape,
-                                             size_t element_size) {
-    const size_t rank = shape.size();
-    if (rank == 0) return {};
-    std::vector<size_t> stride(rank, element_size);
-    for (size_t i = rank; i > 1; --i) {
-        stride[i - 2] = stride[i - 1] *
-            static_cast<size_t>(std::max(shape[i - 1], 1));
-    }
-    return stride;
-}
-
-// Adapts uint8_t input data to int8_t (TF8) by subtracting 128.
-void AdaptU8ToTf8(const void* src, void* dst, size_t count) {
-    const auto* u8_src = static_cast<const uint8_t*>(src);
-    auto* s8_dst = static_cast<int8_t*>(dst);
-    for (size_t i = 0; i < count; ++i) {
-        s8_dst[i] = static_cast<int8_t>(static_cast<int>(u8_src[i]) - 128);
-    }
-}
-
-// Returns true if the input at |index| needs U8->TF8 conversion.
-bool NeedsQuantizationAdaptation(
-    const std::vector<utils::TensorInfo>& info,
-    size_t index, utils::DataType input_dtype) {
-    return (info[index].dtype == utils::DataType::kInt8 &&
-            input_dtype == utils::DataType::kUInt8);
-}
+// kBufferAlignment, ComputeUserBufferStride, AdaptU8ToTf8,
+// and NeedsQuantizationAdaptation are defined in snpe_common.h.
 
 // Creates the appropriate UserBufferEncoding subclass for the given
 // dtype and quantization parameters.  Returns nullptr on error.
@@ -343,6 +315,14 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
         }
     }
 
+    bool cpu_fixed_point = false;
+    {
+        auto it = config.config.find(kConfigCpuFixedPoint);
+        if (it != config.config.end() && it->second == "true") {
+            cpu_fixed_point = true;
+        }
+    }
+
     impl_->container = DlContainer::IDlContainer::open(model_path);
     if (impl_->container == nullptr) {
         ATLAS_LOGE("Failed to open DLC container: %s", model_path.c_str());
@@ -362,6 +342,10 @@ utils::ErrorCode SnpeBackend::Load(const std::string& model_path,
     builder.setUseUserSuppliedBuffers(use_buffer);
     builder.setPlatformConfig(platform_config);
     builder.setCPUFallbackMode(false);
+    if (cpu_fixed_point) {
+        builder.setCpuFixedPointMode(true);
+        ATLAS_LOGD("CPU fixed-point mode enabled");
+    }
 
     // ── Tell SNPE which outputs to expose (manifest order preserved) ──
     if (!model_config_.outputs.empty()) {
