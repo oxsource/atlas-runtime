@@ -932,16 +932,21 @@ utils::ErrorCode SnpeBackend::BuildTensorInfos() {
         QuantParams qp = ExtractQuantParamsFromAttrs(*opt_attrs);
 
         // Manifest config overrides (if present) — manifest is first priority.
+        OverrideTracker tracker(name, info.dtype, qp.scale, qp.zero_point, qp.bandwidth);
         for (const auto& mi : model_config_.inputs) {
             if (mi.name != name) continue;
             if (!mi.shape.empty())  info.shape  = mi.shape;
             if (!mi.layout.empty()) info.layout = mi.layout;
             if (mi.dtype != utils::DataType::kUnknown) {
+                tracker.describe("override input.dtype");
                 info.dtype = mi.dtype;
                 qp = QuantParamsForDtype(mi.dtype);
+            } else {
+                tracker.describe("shape/layout only (no dtype)");
             }
             break;
         }
+        ATLAS_LOGD("%s: %s", __func__, tracker.ToString(info.dtype, qp.scale, qp.zero_point, qp.bandwidth).c_str());
 
         input_info_.push_back(std::move(info));
         input_quant_params_.push_back(std::move(qp));
