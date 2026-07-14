@@ -46,9 +46,7 @@ utils::ErrorCode DtypeConvertNode::Process(const Context& ctx,
 
     output->info           = input.info;
     output->info.dtype     = target_dtype_;
-    output->byte_size      = out_bytes;
-    output->data           = malloc(out_bytes);
-    output->owns_data      = true;
+    output->EnsureCapacity(out_bytes);
 
     if (output->data == nullptr) return utils::ErrorCode::kInvalidArgument;
 

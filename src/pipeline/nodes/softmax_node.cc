@@ -54,11 +54,9 @@ utils::ErrorCode SoftmaxNode::Process(const Context& ctx,
                                          ? input.info.shape[i] : 1);
     }
 
-    // Allocate output (same shape and size as input).
-    output->info      = input.info;
-    output->byte_size = input.byte_size;
-    output->data      = malloc(input.byte_size);
-    output->owns_data = true;
+    // Allocate / reuse output buffer (same shape and size as input).
+    output->info = input.info;
+    output->EnsureCapacity(input.byte_size);
 
     if (output->data == nullptr) return utils::ErrorCode::kInvalidArgument;
 

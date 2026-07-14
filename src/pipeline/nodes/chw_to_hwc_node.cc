@@ -29,9 +29,7 @@ utils::ErrorCode CHWToHWCNode::Process(const Context& ctx,
     output->info           = input.info;
     output->info.shape     = {h, w, c};
     output->info.layout    = "HWC";
-    output->byte_size      = input.byte_size;
-    output->data           = malloc(input.byte_size);
-    output->owns_data      = true;
+    output->EnsureCapacity(input.byte_size);
 
     if (output->data == nullptr) return utils::ErrorCode::kInvalidArgument;
 

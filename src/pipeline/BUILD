@@ -40,6 +40,7 @@ cc_library(
         ":nodes",
         ":pipeline_node",
         ":pipeline_node_factory",
+        "//src/backend/base:i_backend",
         "//src/core:manifest_config",
         "//src/utils:types",
     ],

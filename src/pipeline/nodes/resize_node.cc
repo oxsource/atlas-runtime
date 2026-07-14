@@ -120,9 +120,7 @@ utils::ErrorCode ResizeNode::Process(const Context& ctx,
 
     output->info           = input.info;
     output->info.shape     = {target_h_, target_w_, channels};
-    output->byte_size      = out_bytes;
-    output->data           = malloc(out_bytes);
-    output->owns_data      = true;
+    output->EnsureCapacity(out_bytes);
 
     if (output->data == nullptr) return utils::ErrorCode::kInvalidArgument;
 

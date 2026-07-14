@@ -119,6 +119,7 @@ struct Tensor {
     TensorInfo info;
     void* data = nullptr;
     size_t byte_size = 0;
+    size_t capacity = 0;       // Allocated buffer capacity; 0 = no allocation
     bool owns_data = false;
 
     Tensor() = default;
@@ -135,8 +136,10 @@ struct Tensor {
         : info(std::move(other.info)),
           data(other.data),
           byte_size(other.byte_size),
+          capacity(other.capacity),
           owns_data(other.owns_data) {
         other.data = nullptr;
+        other.capacity = 0;
         other.owns_data = false;
     }
     Tensor& operator=(Tensor&& other) noexcept {
@@ -145,11 +148,30 @@ struct Tensor {
             info = std::move(other.info);
             data = other.data;
             byte_size = other.byte_size;
+            capacity = other.capacity;
             owns_data = other.owns_data;
             other.data = nullptr;
+            other.capacity = 0;
             other.owns_data = false;
         }
         return *this;
+    }
+
+    // Ensures at least |size| bytes of writable space, reallocating if needed.
+    // Does NOT zero the buffer; the caller must fully overwrite [0, size).
+    // On allocation failure, all members remain unchanged.
+    void EnsureCapacity(size_t size) {
+        if (capacity >= size) {
+            byte_size = size;
+            return;
+        }
+        void* new_data = malloc(size);
+        if (!new_data) return;  // allocation failed — preserve existing state
+        if (owns_data && data) free(data);
+        data = new_data;
+        capacity = size;
+        byte_size = size;
+        owns_data = true;
     }
 };
 

@@ -853,11 +853,13 @@ atlas/
 
 ---
 
+> **【补充】** Proposal-017 | 2026-07-14 | Pipeline buffer reuse: Tensor capacity + EnsureCapacity + endpoint() + GetInputTensor()/GetOutputTensor(). 详细设计见 docs/proposals/017-pipeline-buffer-reuse.md。
+
 ## Feature 记录
 
 | Proposal | 日期 | 简述 | 状态 |
 |----------|------|------|------|
-
+| [Proposal-017](proposals/017-pipeline-buffer-reuse.md) | 2026-07-14 | Pipeline buffer reuse: Tensor capacity + EnsureCapacity + endpoint() + GetInputTensor()/GetOutputTensor() | 已采纳 |
 ---
 
 ## Bugfix 记录

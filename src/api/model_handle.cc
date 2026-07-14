@@ -48,7 +48,7 @@ utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
 
     utils::Tensor preprocessed;
     if (!entry_->input_pipelines.empty()) {
-        ctx.input_index = 0;
+        ctx.input_index_ = 0;
         auto ret = entry_->input_pipelines[0].Run(raw_input, &preprocessed, ctx);
         if (ret != utils::ErrorCode::kOk) return ret;
     } else {
@@ -81,7 +81,7 @@ utils::ErrorCode ModelHandle::Run(const utils::Tensor& raw_input,
     outputs->clear();
     ctx.user.flags = (cfg.flags & ~0x03) | pipeline::kPipeFlagOutputPipe;
     for (size_t i = 0; i < raw_outputs.size(); ++i) {
-        ctx.output_index = i;
+        ctx.output_index_ = i;
         if (i < entry_->output_pipelines.size() &&
             !entry_->output_pipelines[i].IsEmpty()) {
             utils::Tensor postprocessed;
@@ -127,7 +127,7 @@ utils::ErrorCode ModelHandle::Run(const std::vector<utils::Tensor>& raw_inputs,
         utils::Tensor processed;
         if (i < entry_->input_pipelines.size() &&
             !entry_->input_pipelines[i].IsEmpty()) {
-            ctx.input_index = i;
+            ctx.input_index_ = i;
             auto ret = entry_->input_pipelines[i].Run(raw_inputs[i], &processed, ctx);
             if (ret != utils::ErrorCode::kOk) return ret;
         } else {
@@ -159,7 +159,7 @@ utils::ErrorCode ModelHandle::Run(const std::vector<utils::Tensor>& raw_inputs,
     outputs->clear();
     ctx.user.flags = (cfg.flags & ~0x03) | pipeline::kPipeFlagOutputPipe;
     for (size_t i = 0; i < raw_outputs.size(); ++i) {
-        ctx.output_index = i;
+        ctx.output_index_ = i;
         if (i < entry_->output_pipelines.size() &&
             !entry_->output_pipelines[i].IsEmpty()) {
             utils::Tensor postprocessed;

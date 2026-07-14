@@ -64,13 +64,11 @@ utils::ErrorCode TopKNode::Process(const Context& ctx,
     }
     std::reverse(values.begin(), values.end());
 
-    // Allocate output tensor of shape [k].
+    // Allocate / reuse output tensor of shape [k].
     const size_t out_bytes = static_cast<size_t>(k_) * sizeof(float);
     output->info           = input.info;
     output->info.shape     = {k_};
-    output->byte_size      = out_bytes;
-    output->data           = malloc(out_bytes);
-    output->owns_data      = true;
+    output->EnsureCapacity(out_bytes);
 
     if (output->data == nullptr) return utils::ErrorCode::kInvalidArgument;
 
