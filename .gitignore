@@ -1,6 +1,10 @@
 # Bazel build artifacts and symlinks
 bazel-*
 
+# Auto-generated platform setup (machine-local, DO NOT commit)
+.user.bazelrc
+.configure.bazelrc
+
 # macOS metadata
 .DS_Store
 
